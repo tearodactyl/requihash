@@ -1,0 +1,48 @@
+<svg width="720" height="420" viewBox="0 0 720 420" role="img" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+<title>Equihash memory collapse: expected naive layout vs achieved 2016-17 layout</title>
+<desc>Log-scale bar comparison of per-row storage and total peak memory at (200,9): the naive growing-index-tuple layout versus the index-pointer, hash-trimmed, statically-allocated layout, showing the many-fold reduction to roughly 49 MB.</desc>
+<text x="20" y="30" font-size="16" font-weight="500" fill="#2C2C2A">Equihash memory collapse at (200,9): naive vs 2016-17 layout</text>
+<text x="20" y="50" font-size="12" fill="#5F5E5A">Peak memory, log scale. The gap is representation, not algorithm — hash-count is unchanged.</text>
+
+<!-- axis -->
+<line x1="180" y1="80" x2="180" y2="330" stroke="#888780" stroke-width="1"/>
+<line x1="180" y1="330" x2="680" y2="330" stroke="#888780" stroke-width="1"/>
+
+<!-- gridlines (log): 16MB, 64MB, 256MB, 1GB positions -->
+<g font-size="11" fill="#888780">
+<line x1="180" y1="290" x2="680" y2="290" stroke="#D3D1C7" stroke-width="0.5"/><text x="120" y="294">~49 MB</text>
+<line x1="180" y1="230" x2="680" y2="230" stroke="#D3D1C7" stroke-width="0.5"/><text x="120" y="234">~144 MB</text>
+<line x1="180" y1="170" x2="680" y2="170" stroke="#D3D1C7" stroke-width="0.5"/><text x="120" y="174">~500 MB</text>
+<line x1="180" y1="110" x2="680" y2="110" stroke="#D3D1C7" stroke-width="0.5"/><text x="115" y="114">~2.5 GB</text>
+</g>
+
+<!-- bars -->
+<!-- naive ~2.5GB -> top ~110 -->
+<rect x="230" y="110" width="90" height="220" fill="#F09595" stroke="#A32D2D" stroke-width="0.5"/>
+<text x="275" y="350" font-size="12" fill="#2C2C2A" text-anchor="middle">naive</text>
+<text x="275" y="365" font-size="11" fill="#888780" text-anchor="middle">growing index</text>
+<text x="275" y="378" font-size="11" fill="#888780" text-anchor="middle">tuples</text>
+<text x="275" y="102" font-size="11" fill="#A32D2D" text-anchor="middle">~2.5 GB</text>
+
+<!-- xenoncat 178MB -> ~215 -->
+<rect x="360" y="215" width="90" height="115" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+<text x="405" y="350" font-size="12" fill="#2C2C2A" text-anchor="middle">xenoncat</text>
+<text x="405" y="365" font-size="11" fill="#888780" text-anchor="middle">index ptrs +</text>
+<text x="405" y="378" font-size="11" fill="#888780" text-anchor="middle">static alloc</text>
+<text x="405" y="207" font-size="11" fill="#854F0B" text-anchor="middle">178 MB</text>
+
+<!-- tromp 144MB -> 230 -->
+<rect x="490" y="230" width="90" height="100" fill="#9FE1CB" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="535" y="350" font-size="12" fill="#2C2C2A" text-anchor="middle">tromp</text>
+<text x="535" y="365" font-size="11" fill="#888780" text-anchor="middle">2^12 buckets +</text>
+<text x="535" y="378" font-size="11" fill="#888780" text-anchor="middle">layout</text>
+<text x="535" y="222" font-size="11" fill="#0F6E56" text-anchor="middle">144 MB</text>
+
+<!-- floor 49MB -> 290 -->
+<rect x="610" y="290" width="60" height="40" fill="#B5D4F4" stroke="#185FA5" stroke-width="0.5"/>
+<text x="640" y="350" font-size="12" fill="#2C2C2A" text-anchor="middle">floor</text>
+<text x="640" y="365" font-size="11" fill="#888780" text-anchor="middle">all counted</text>
+<text x="640" y="282" font-size="11" fill="#185FA5" text-anchor="middle">~49 MB</text>
+
+<text x="20" y="405" font-size="11" fill="#5F5E5A">Index-pointer storage alone is the (2^k)/k win: for k=9 that is ~57x on the index component. Req/ solvers still sit at the naive-index end (H5).</text>
+</svg>

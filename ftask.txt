@@ -1,0 +1,13 @@
+A. Equihash memory-hard PoW algorithm built into Zcash cryptocurrency has gone through several rounds of optimization back in 2017, but largely lingered since. Several later attempts at different but similarly memory-hard PoW have been implemented since. Review algorithmic and engineering aspects in depth, study sample implementations online in C++ or Rust or GPU frameworks, propose or prototype improvements.
+
+B. Review post-quantum algorithm opportunities in cryptocurrencies, for PoW, encryption, Zero Knowledge, ranging from existing implementations and prototypes and proposals to distant possibilities and directions.
+
+C. Review algorithms that could be doing useful work while computing some PoW hard results, taking into account widely different requirements for the two applications.
+
+D. Propose algorithms in each of the categories that are particularly suitable for inference-centric hardware, from cutting edge GPU models and onto emerging large memory and dedicated hardware blocks.
+
+D. Current generation of attention matrix LLMs do not necessarily yield optimally to hardware solutions with specific hierarchical 3+ cache architectures, multi-processor busses and protocols, tuned to enterprise and web loads. Also, 32+ bit float precision is unlikely to be necessary going forward, given how well 4 bit quantized models perform. Propose algorithms and matching data structures that would render naturally into compiled hardware blocks with embedded memory and/or alternative numerical representations, like log, 3-value, or using both positive and negative values well, or representing pruning, etc
+
+E. Review novel opportunities for post-training / fine-tuning that's deeply personalized and private, evolving with the individual over decades. Yet, direct manipulation of weights is impractical, as frontier model generations are trained so quickly and relentlessly. Most will pursue individualized data accumulation, that potentially can be used for guards or directions or even tuning. But is there more possible, beyond piling-on data and toward strong algo/method + data/structure?
+
+Task: Review the range of questions and topics, create a plan and a method and structure for presentation of findings, multi-level conclusions, from macro to immediately actionable, further directions per science and engineering, and business and social impact. Target a business savvy and financially competent scientist, an experienced software engineer. Introduce terminology, use inline clickable links, start with sufficient leadins, optimize accessibility of material and minimize redundancy, use illustration and visualization devices.

@@ -1,0 +1,793 @@
+Analysis of sampling req_profile (pid 51725) every 1 millisecond
+Process:         req_profile [51725]
+Path:            /Users/USER/*/req_profile
+Load Address:    0x10450c000
+Identifier:      req_profile
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  zsh [51723]
+Target Type:     live task
+
+Date/Time:       2026-07-04 23:59:13.770 -0700
+Launch Time:     2026-07-04 23:59:11.719 -0700
+OS Version:      macOS 26.3 (25D125)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         49.4M
+Physical footprint (peak):  88.1M
+Idle exit:                  untracked
+----
+
+Call graph:
+    4237 Thread_31121087   DispatchQueue_1: com.apple.main-thread  (serial)
+      4237 start  (in dyld) + 7184  [0x1980d9d54]
+        4237 main  (in req_profile) + 820  [0x10450e24c]
+          4237 std::sys::backtrace::__rust_begin_short_backtrace::h0b12218ec33491bf  (in req_profile) + 12  [0x10450c844]  backtrace.rs:158
+            1489 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1868  [0x10450cf98]  req_profile.rs:12
+            + 1489 core::slice::sort::stable::driftsort_main::h0ae4e7f558a2d90a  (in req_profile) + 268  [0x104513340]  mod.rs:135
+            +   1278 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! 1149 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : 1012 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | 827 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + 631 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! 458 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : 304 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | 187 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | + 102 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | + ! 35 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | + ! : 14 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | + ! : | 6 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1368  [0x1045140ac]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | + ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : | 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 2 _platform_memcmp  (in libsystem_platform.dylib) + 0,280  [0x1984aaef0,0x1984ab008]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 60  [0x104513b90]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 716  [0x104513e20]  quicksort.rs:62
+            +   ! : | + ! : | + ! : 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2164,1408,...  [0x1045143c8,0x1045140d4,...]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | + ! : | 3 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 2 _platform_memcmp  (in libsystem_platform.dylib) + 260,272  [0x1984aaff4,0x1984ab000]
+            +   ! : | + ! : | + ! : 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : | + ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | + ! : | + ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + ! : | + ! : |   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + ! : | + ! : |     1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 140  [0x1984aaf7c]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + ! : | + ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 180  [0x1984ad434]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 644  [0x104513dd8]  quicksort.rs:62
+            +   ! : | + ! : | + ! 14 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1928,1844,...  [0x1045142dc,0x104514288,...]  quicksort.rs:27
+            +   ! : | + ! : | + ! 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 8 _platform_memcmp  (in libsystem_platform.dylib) + 140,260,...  [0x1984aaf7c,0x1984aaff4,...]
+            +   ! : | + ! : | + ! 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 8 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : | + ! 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 7 _platform_memcmp  (in libsystem_platform.dylib) + 272,168,...  [0x1984ab000,0x1984aaf98,...]
+            +   ! : | + ! : | + ! 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | + ! : 7 _platform_memcmp  (in libsystem_platform.dylib) + 280,260,...  [0x1984ab008,0x1984aaff4,...]
+            +   ! : | + ! : | + ! 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! : | + ! : 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! : | + ! 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 5 _platform_memcmp  (in libsystem_platform.dylib) + 272,280  [0x1984ab000,0x1984ab008]
+            +   ! : | + ! : | + ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : | + ! : | + ! : | 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 256  [0x104514694]  smallsort.rs:642
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 344  [0x1045146ec]  smallsort.rs:649
+            +   ! : | + ! : | + ! :   1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 112  [0x104513bc4]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : | + ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 376  [0x10451470c]  smallsort.rs:654
+            +   ! : | + ! : | + ! 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 512  [0x104513d54]  quicksort.rs:57
+            +   ! : | + ! : | + ! : 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   ! : | + ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 812  [0x104513e80]  quicksort.rs:0
+            +   ! : | + ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 340  [0x104513ca8]  quicksort.rs:39
+            +   ! : | + ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | + ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + ! : | + ! : 1 _platform_memmove  (in libsystem_platform.dylib) + 180  [0x1984ad434]
+            +   ! : | + ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 716  [0x104513e20]  quicksort.rs:62
+            +   ! : | + ! : | + 14 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | + ! 14 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : | + 13 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1500,1352,...  [0x104514130,0x10451409c,...]  quicksort.rs:27
+            +   ! : | + ! : | + 12 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 644,696,...  [0x104513dd8,0x104513e0c,...]  quicksort.rs:62
+            +   ! : | + ! : | + 10 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | + ! 10 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! : | + 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + ! 8 _platform_memcmp  (in libsystem_platform.dylib) + 272,260,...  [0x1984ab000,0x1984aaff4,...]
+            +   ! : | + ! : | + 6 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! : | + ! 6 _platform_memcmp  (in libsystem_platform.dylib) + 168,140,...  [0x1984aaf98,0x1984aaf7c,...]
+            +   ! : | + ! : | + 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + ! 3 _platform_memcmp  (in libsystem_platform.dylib) + 0,140,...  [0x1984aaef0,0x1984aaf7c,...]
+            +   ! : | + ! : | + ! 2 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! : | + 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 112  [0x104513bc4]  quicksort.rs:27
+            +   ! : | + ! : | + ! 2 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 256  [0x104514694]  smallsort.rs:642
+            +   ! : | + ! : | + ! : 2 _platform_memcmp  (in libsystem_platform.dylib) + 168,280  [0x1984aaf98,0x1984ab008]
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+            +   ! : | + ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 172  [0x104514640]  smallsort.rs:641
+            +   ! : | + ! : | + 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | + ! 2 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! : | + ! 2 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + ! 3 _platform_memcmp  (in libsystem_platform.dylib) + 260,280  [0x1984aaff4,0x1984ab008]
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 148  [0x104514628]  smallsort.rs:641
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 176  [0x104513c04]  quicksort.rs:31
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 276  [0x104513c68]  quicksort.rs:39
+            +   ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : | + !   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | + ! : | + !     1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 208  [0x104513c24]  quicksort.rs:39
+            +   ! : | + ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1012  [0x104513f48]  quicksort.rs:67
+            +   ! : | + ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 140  [0x1984aaf7c]
+            +   ! : | + ! : | 40 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | + 40 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : | 16 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2036,2164,...  [0x104514348,0x1045143c8,...]  quicksort.rs:27
+            +   ! : | + ! : | 12 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | + 12 _platform_memcmp  (in libsystem_platform.dylib) + 260,272,...  [0x1984aaff4,0x1984ab000,...]
+            +   ! : | + ! : | 9 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 644,696,...  [0x104513dd8,0x104513e0c,...]  quicksort.rs:62
+            +   ! : | + ! : | 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | + 8 _platform_memcmp  (in libsystem_platform.dylib) + 272,168,...  [0x1984ab000,0x1984aaf98,...]
+            +   ! : | + ! : | 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | + 8 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! : | 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | + 7 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! : | 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | + 5 _platform_memcmp  (in libsystem_platform.dylib) + 272,280  [0x1984ab000,0x1984ab008]
+            +   ! : | + ! : | 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 176  [0x104514824]  pivot.rs:71
+            +   ! : | + ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 36  [0x104514798]  pivot.rs:55
+            +   ! : | + ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | + ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : | 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 20  [0x104513b68]  quicksort.rs:16
+            +   ! : | + ! : | 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! : | + 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : | + ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + ! : | + 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 344  [0x1045146ec]  smallsort.rs:649
+            +   ! : | + ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! : | + 2 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 804  [0x104513e78]  quicksort.rs:0
+            +   ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 276  [0x104513c68]  quicksort.rs:39
+            +   ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | + ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1012  [0x104513f48]  quicksort.rs:67
+            +   ! : | + ! : |   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : 62 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : | 62 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : 22 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1544,1540,...  [0x10451415c,0x104514158,...]  quicksort.rs:27
+            +   ! : | + ! : 16 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 696,572,...  [0x104513e0c,0x104513d90,...]  quicksort.rs:62
+            +   ! : | + ! : 13 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : | 13 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : 10 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : | 10 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! : 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : | 8 _platform_memcmp  (in libsystem_platform.dylib) + 0,260,...  [0x1984aaef0,0x1984aaff4,...]
+            +   ! : | + ! : 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + ! : | 7 _platform_memmove  (in libsystem_platform.dylib) + 88,180  [0x1984ad3d8,0x1984ad434]
+            +   ! : | + ! : 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : | 5 _platform_memcmp  (in libsystem_platform.dylib) + 260,140,...  [0x1984aaff4,0x1984aaf7c,...]
+            +   ! : | + ! : 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+            +   ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 256  [0x104514694]  smallsort.rs:642
+            +   ! : | + ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 284  [0x1045146b0]  smallsort.rs:649
+            +   ! : | + ! : 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : | 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 112  [0x104513bc4]  quicksort.rs:27
+            +   ! : | + ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 16  [0x1045145a4]  smallsort.rs:612
+            +   ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + ! : |   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + ! : |     1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | + ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 512  [0x104513d54]  quicksort.rs:57
+            +   ! : | + ! 73 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! : 73 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + ! 27 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 644,696,...  [0x104513dd8,0x104513e0c,...]  quicksort.rs:62
+            +   ! : | + ! 25 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1348,1544,...  [0x104514098,0x10451415c,...]  quicksort.rs:27
+            +   ! : | + ! 9 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! : 7 _platform_memcmp  (in libsystem_platform.dylib) + 272,140,...  [0x1984ab000,0x1984aaf7c,...]
+            +   ! : | + ! : 2 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! : 4 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : | 2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + ! : | + 2 _platform_memcmp  (in libsystem_platform.dylib) + 260,272  [0x1984aaff4,0x1984ab000]
+            +   ! : | + ! : | 2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 176,212  [0x104514824,0x104514848]  pivot.rs:71
+            +   ! : | + ! : 3 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | + ! :   2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | + ! :   + 2 _platform_memcmp  (in libsystem_platform.dylib) + 0,168  [0x1984aaef0,0x1984aaf98]
+            +   ! : | + ! :   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 304  [0x1045148a4]  pivot.rs:73
+            +   ! : | + ! 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! : 5 _platform_memcmp  (in libsystem_platform.dylib) + 272,260  [0x1984ab000,0x1984aaff4]
+            +   ! : | + ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! : 2 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+            +   ! : | + ! : | 2 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : | + ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 344  [0x1045146ec]  smallsort.rs:649
+            +   ! : | + ! :   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! : 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,140,...  [0x1984ab000,0x1984aaf7c,...]
+            +   ! : | + ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + ! : 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x1984ab000,0x1984aaef0,...]
+            +   ! : | + ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! : 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,260,...  [0x1984ab000,0x1984aaff4,...]
+            +   ! : | + ! 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + ! : 3 _platform_memmove  (in libsystem_platform.dylib) + 24,88,...  [0x1984ad398,0x1984ad3d8,...]
+            +   ! : | + ! 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 340  [0x104513ca8]  quicksort.rs:39
+            +   ! : | + ! : 2 _platform_memcmp  (in libsystem_platform.dylib) + 140,272  [0x1984aaf7c,0x1984ab000]
+            +   ! : | + ! 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 512  [0x104513d54]  quicksort.rs:57
+            +   ! : | + ! : 2 _platform_memcmp  (in libsystem_platform.dylib) + 140,272  [0x1984aaf7c,0x1984ab000]
+            +   ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 112  [0x104513bc4]  quicksort.rs:27
+            +   ! : | + ! : 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 344  [0x1045146ec]  smallsort.rs:649
+            +   ! : | + ! :   1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 276  [0x104513c68]  quicksort.rs:39
+            +   ! : | + ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 364  [0x104513cc0]  quicksort.rs:39
+            +   ! : | + 123 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + ! 123 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | + 31 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 696,784,...  [0x104513e0c,0x104513e64,...]  quicksort.rs:62
+            +   ! : | + 9 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1828,1308,...  [0x104514278,0x104514070,...]  quicksort.rs:27
+            +   ! : | + 8 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + ! 8 _platform_memmove  (in libsystem_platform.dylib) + 180,88,...  [0x1984ad434,0x1984ad3d8,...]
+            +   ! : | + 5 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + ! 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,140,...  [0x1984ab000,0x1984aaf7c,...]
+            +   ! : | + ! 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + ! 4 _platform_memcmp  (in libsystem_platform.dylib) + 272,260  [0x1984ab000,0x1984aaff4]
+            +   ! : | + 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + ! 3 _platform_memcmp  (in libsystem_platform.dylib) + 272,140  [0x1984ab000,0x1984aaf7c]
+            +   ! : | + ! 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | + ! 2 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+            +   ! : | + ! : 2 _platform_memcmp  (in libsystem_platform.dylib) + 272,280  [0x1984ab000,0x1984ab008]
+            +   ! : | + ! 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 36  [0x1045145b8]  smallsort.rs:626
+            +   ! : | + 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + ! :   1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + ! : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 272  [0x104514884]  pivot.rs:71
+            +   ! : | + ! :   1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | + !   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | + !     1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 272  [0x104514884]  pivot.rs:71
+            +   ! : | + !       1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   ! : | + 2 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 424,444  [0x10451473c,0x104514750]  smallsort.rs:658
+            +   ! : | + 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + ! 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + ! 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + ! 1 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            +   ! : | + 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | 123 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | + 123 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : | 29 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 696,644,...  [0x104513e0c,0x104513dd8,...]  quicksort.rs:62
+            +   ! : | 11 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | + 11 _platform_memmove  (in libsystem_platform.dylib) + 88,204,...  [0x1984ad3d8,0x1984ad44c,...]
+            +   ! : | 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1896,1884,...  [0x1045142bc,0x1045142b0,...]  quicksort.rs:27
+            +   ! : | 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | + 2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 284  [0x104514890]  pivot.rs:73
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + !   1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | +   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 40  [0x10451479c]  pivot.rs:65
+            +   ! : | 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+            +   ! : | + 3 _platform_memcmp  (in libsystem_platform.dylib) + 272,140  [0x1984ab000,0x1984aaf7c]
+            +   ! : | 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | + 3 _platform_memcmp  (in libsystem_platform.dylib) + 272,168  [0x1984ab000,0x1984aaf98]
+            +   ! : | 3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+            +   ! : | + 3 _platform_memcmp  (in libsystem_platform.dylib) + 272,0  [0x1984ab000,0x1984aaef0]
+            +   ! : | 2 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : | + 2 _platform_memcmp  (in libsystem_platform.dylib) + 272,280  [0x1984ab000,0x1984ab008]
+            +   ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 260  [0x1984aaff4]
+            +   ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+            +   ! : | + 1 _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+            +   ! : | 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 176  [0x104513c04]  quicksort.rs:31
+            +   ! : 91 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : | 91 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! : 32 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 696,644,...  [0x104513e0c,0x104513dd8,...]  quicksort.rs:62
+            +   ! : 7 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : | 7 _platform_memmove  (in libsystem_platform.dylib) + 88  [0x1984ad3d8]
+            +   ! : 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : | 2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | + !   1 _platform_memcmp  (in libsystem_platform.dylib) + 140  [0x1984aaf7c]
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : | +   1 _platform_memcmp  (in libsystem_platform.dylib) + 280  [0x1984ab008]
+            +   ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : | +   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | +     1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | +       1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 256  [0x104514874]  pivot.rs:71
+            +   ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : |   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 284  [0x104514890]  pivot.rs:73
+            +   ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+            +   ! : | 1 core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+            +   ! : |   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   ! : | 1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   ! : 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! 80 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! : 80 _platform_memcmp  (in libsystem_platform.dylib) + 272,280,...  [0x1984ab000,0x1984ab008,...]
+            +   ! 33 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 784,696,...  [0x104513e64,0x104513e0c,...]  quicksort.rs:62
+            +   ! 9 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! : 9 _platform_memmove  (in libsystem_platform.dylib) + 88  [0x1984ad3d8]
+            +   ! 4 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! : 3 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : | 2 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! : | + ! 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   ! : | + !   1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! : | + 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 304  [0x1045148a4]  pivot.rs:73
+            +   ! : | 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   ! : |   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : |     1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   ! : |       1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! : |         1 _platform_memcmp  (in libsystem_platform.dylib) + 140  [0x1984aaf7c]
+            +   ! : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   ! :   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+            +   ! :     1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+            +   ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+            +   ! : 1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   ! 1 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+            +   70 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 784,696,...  [0x104513e64,0x104513e0c,...]  quicksort.rs:62
+            +   69 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+            +   ! 69 _platform_memcmp  (in libsystem_platform.dylib) + 272,260,...  [0x1984ab000,0x1984aaff4,...]
+            +   44 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+            +   ! 44 _platform_memmove  (in libsystem_platform.dylib) + 88  [0x1984ad3d8]
+            +   24 core::slice::sort::stable::drift::sort::h8c65ca255b9b115d  (in req_profile) + 1152,1316,...  [0x104513800,0x1045138a4,...]  drift.rs:64
+            +   3 core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+            +   ! 3 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   !   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   !   : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+            +   !   :   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 272  [0x104514884]  pivot.rs:71
+            +   !   :     1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   !   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+            +   !   : 1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   !   :   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 272  [0x104514884]  pivot.rs:71
+            +   !   :     1 _platform_memcmp  (in libsystem_platform.dylib) + 168  [0x1984aaf98]
+            +   !   1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+            +   !     1 core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+            +   !       1 _platform_memcmp  (in libsystem_platform.dylib) + 272  [0x1984ab000]
+            +   1 core::slice::sort::stable::drift::sort::h8c65ca255b9b115d  (in req_profile) + 1096  [0x1045137c8]  drift.rs:0
+            839 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2396,2408,...  [0x10450d1a8,0x10450d1b4,...]  req_profile.rs:12
+            280 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1248  [0x10450cd2c]  req_profile.rs:12
+            + 117 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 780,932,...  [0x104515760,0x1045157f8,...]  blake2b.rs:0
+            + 57 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 976,1032,...  [0x104515824,0x10451585c,...]  blake2b.rs:67
+            + 46 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 404,896,...  [0x1045155e8,0x1045157d4,...]  blake2b.rs:63
+            + 40 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 1068  [0x104515880]  blake2b.rs:70
+            + 10 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 960  [0x104515814]  blake2b.rs:66
+            + 5 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 52,36,...  [0x104515488,0x104515478,...]  blake2b.rs:50
+            + 4 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 216,176  [0x10451552c,0x104515504]  blake2b.rs:53
+            + 1 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 4  [0x104515458]  blake2b.rs:47
+            238 req_profile::main::hb5cb2b724026333e  (in req_profile) + 3036  [0x10450d428]  req_profile.rs:12
+            + 221 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 144  [0x10453f284]  mod.rs:557
+            + ! 212 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 204  [0x10453f1bc]  mod.rs:781
+            + ! : 165 _realloc  (in libsystem_malloc.dylib) + 452  [0x1982d0c70]
+            + ! : | 148 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x1982d0440]
+            + ! : | + 65 xzm_realloc  (in libsystem_malloc.dylib) + 908  [0x1982c3648]
+            + ! : | + ! 32 _xzm_free  (in libsystem_malloc.dylib) + 728  [0x1982c3a1c]
+            + ! : | + ! : 29 mach_absolute_time  (in libsystem_kernel.dylib) + 108,16,...  [0x1984610fc,0x1984610a0,...]
+            + ! : | + ! : 3 DYLD-STUB$$mach_absolute_time  (in libsystem_malloc.dylib) + 12  [0x1982d8760]
+            + ! : | + ! 25 _xzm_free  (in libsystem_malloc.dylib) + 952,28,...  [0x1982c3afc,0x1982c3760,...]
+            + ! : | + ! 8 _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+            + ! : | + !   3 __bzero  (in libsystem_platform.dylib) + 0  [0x1984ad050]
+            + ! : | + !   3 _platform_memset  (in libsystem_platform.dylib) + 180,208  [0x1984ad164,0x1984ad180]
+            + ! : | + !   2 DYLD-STUB$$_platform_bzero  (in libsystem_malloc.dylib) + 12  [0x1982d8460]
+            + ! : | + 36 xzm_realloc  (in libsystem_malloc.dylib) + 812  [0x1982c35e8]
+            + ! : | + ! 16 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 12,168,...  [0x1982c718c,0x1982c7228,...]
+            + ! : | + ! 7 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 108,208,...  [0x1982c2c8c,0x1982c2cf0,...]
+            + ! : | + ! 7 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 184,8,...  [0x1982c3144,0x1982c3094,...]
+            + ! : | + ! 6 _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+            + ! : | + !   6 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+            + ! : | + !     6 xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+            + ! : | + !       6 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+            + ! : | + !         6 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            + ! : | + !           6 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8,4  [0x198460cb8,0x198460cb4]
+            + ! : | + 35 xzm_realloc  (in libsystem_malloc.dylib) + 24,244,...  [0x1982c32d4,0x1982c33b0,...]
+            + ! : | + 11 xzm_realloc  (in libsystem_malloc.dylib) + 884  [0x1982c3630]
+            + ! : | + ! 10 _platform_memmove  (in libsystem_platform.dylib) + 428,204,...  [0x1984ad52c,0x1984ad44c,...]
+            + ! : | + ! 1 DYLD-STUB$$_platform_memmove  (in libsystem_malloc.dylib) + 12  [0x1982d8480]
+            + ! : | + 1 default_zone_realloc  (in libsystem_malloc.dylib) + 32  [0x19829cd98]
+            + ! : | 11 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 72,24,...  [0x1982d03f4,0x1982d03c4,...]
+            + ! : | 6 xzm_realloc  (in libsystem_malloc.dylib) + 936,924  [0x1982c3664,0x1982c3658]
+            + ! : 24 _realloc  (in libsystem_malloc.dylib) + 252  [0x1982d0ba8]
+            + ! : | 24 xzm_malloc_zone_size  (in libsystem_malloc.dylib) + 300,256,...  [0x1982cc264,0x1982cc238,...]
+            + ! : 16 _realloc  (in libsystem_malloc.dylib) + 36,248,...  [0x1982d0ad0,0x1982d0ba4,...]
+            + ! : 5 realloc  (in libsystem_malloc.dylib) + 0  [0x19829b8ac]
+            + ! : 2 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 220  [0x1982d0488]
+            + ! 5 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 36,40  [0x10453f114,0x10453f118]  mod.rs:776
+            + ! 2 _realloc  (in libsystem_malloc.dylib) + 504  [0x1982d0ca4]
+            + ! 1 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 52  [0x10453f124]  mod.rs:0
+            + ! 1 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 12  [0x10453f0fc]  mod.rs:766
+            + 11 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 80,56,...  [0x10453f244,0x10453f22c,...]  mod.rs:557
+            + 3 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 248  [0x10453f1e8]  mod.rs:788
+            + 2 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 8  [0x10453f1fc]  mod.rs:551
+            + 1 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 164  [0x10453f298]  mod.rs:560
+            229 req_profile::main::hb5cb2b724026333e  (in req_profile) + 3012  [0x10450d410]  req_profile.rs:12
+            + 220 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 144  [0x10453f284]  mod.rs:557
+            + ! 213 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 204  [0x10453f1bc]  mod.rs:781
+            + ! : 179 _realloc  (in libsystem_malloc.dylib) + 452  [0x1982d0c70]
+            + ! : | 169 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x1982d0440]
+            + ! : | + 86 xzm_realloc  (in libsystem_malloc.dylib) + 908  [0x1982c3648]
+            + ! : | + ! 42 _xzm_free  (in libsystem_malloc.dylib) + 728  [0x1982c3a1c]
+            + ! : | + ! : 42 mach_absolute_time  (in libsystem_kernel.dylib) + 108,112,...  [0x1984610fc,0x198461100,...]
+            + ! : | + ! 31 _xzm_free  (in libsystem_malloc.dylib) + 952,204,...  [0x1982c3afc,0x1982c3810,...]
+            + ! : | + ! 13 _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+            + ! : | + !   8 __bzero  (in libsystem_platform.dylib) + 0  [0x1984ad050]
+            + ! : | + !   3 _platform_memset  (in libsystem_platform.dylib) + 180  [0x1984ad164]
+            + ! : | + !   2 DYLD-STUB$$_platform_bzero  (in libsystem_malloc.dylib) + 12  [0x1982d8460]
+            + ! : | + 42 xzm_realloc  (in libsystem_malloc.dylib) + 812  [0x1982c35e8]
+            + ! : | + ! 20 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88,408,...  [0x1982c71d8,0x1982c7318,...]
+            + ! : | + ! 9 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 108,0,...  [0x1982c2c8c,0x1982c2c20,...]
+            + ! : | + ! 9 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 32,192,...  [0x1982c30ac,0x1982c314c,...]
+            + ! : | + ! 4 _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+            + ! : | + !   4 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+            + ! : | + !     4 xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+            + ! : | + !       3 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+            + ! : | + !       | 3 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            + ! : | + !       |   3 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8  [0x198460cb8]
+            + ! : | + !       1 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 124  [0x1982acdbc]
+            + ! : | + !         1 _xzm_reclaim_mark_used_locked  (in libsystem_malloc.dylib) + 60  [0x1982af2d0]
+            + ! : | + !           1 mach_vm_reclaim_try_cancel  (in libsystem_kernel.dylib) + 260  [0x198473dd4]
+            + ! : | + !             1 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1984610fc]
+            + ! : | + 24 xzm_realloc  (in libsystem_malloc.dylib) + 964,396,...  [0x1982c3680,0x1982c3448,...]
+            + ! : | + 14 xzm_realloc  (in libsystem_malloc.dylib) + 884  [0x1982c3630]
+            + ! : | + ! 8 _platform_memmove  (in libsystem_platform.dylib) + 0,428,...  [0x1984ad380,0x1984ad52c,...]
+            + ! : | + ! 6 DYLD-STUB$$_platform_memmove  (in libsystem_malloc.dylib) + 12  [0x1982d8480]
+            + ! : | + 2 default_zone_realloc  (in libsystem_malloc.dylib) + 32  [0x19829cd98]
+            + ! : | + 1 _xzm_free  (in libsystem_malloc.dylib) + 1332  [0x1982c3c78]
+            + ! : | 8 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 24,48,...  [0x1982d03c4,0x1982d03dc,...]
+            + ! : | 2 xzm_realloc  (in libsystem_malloc.dylib) + 924,928  [0x1982c3658,0x1982c365c]
+            + ! : 18 _realloc  (in libsystem_malloc.dylib) + 252  [0x1982d0ba8]
+            + ! : | 18 xzm_malloc_zone_size  (in libsystem_malloc.dylib) + 116,480,...  [0x1982cc1ac,0x1982cc318,...]
+            + ! : 7 _realloc  (in libsystem_malloc.dylib) + 16,20,...  [0x1982d0abc,0x1982d0ac0,...]
+            + ! : 7 realloc  (in libsystem_malloc.dylib) + 0  [0x19829b8ac]
+            + ! : 1 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 220  [0x1982d0488]
+            + ! : 1 xzm_malloc_zone_size  (in libsystem_malloc.dylib) + 524  [0x1982cc344]
+            + ! 4 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 36  [0x10453f114]  mod.rs:776
+            + ! 1 _realloc  (in libsystem_malloc.dylib) + 504  [0x1982d0ca4]
+            + ! 1 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 52  [0x10453f124]  mod.rs:0
+            + ! 1 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 224  [0x10453f1d0]  mod.rs:787
+            + 4 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 56,80  [0x10453f22c,0x10453f244]  mod.rs:557
+            + 3 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 248  [0x10453f1e8]  mod.rs:788
+            + 2 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 8  [0x10453f1fc]  mod.rs:551
+            202 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1508  [0x10450ce30]  req_profile.rs:12
+            + 156 _xzm_free  (in libsystem_malloc.dylib) + 0,1024,...  [0x1982c3744,0x1982c3b44,...]
+            + 30 _free  (in libsystem_malloc.dylib) + 0,44,...  [0x1982d0a2c,0x1982d0a58,...]
+            + 14 _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+            + ! 7 _platform_memset  (in libsystem_platform.dylib) + 180,188,...  [0x1984ad164,0x1984ad16c,...]
+            + ! 5 __bzero  (in libsystem_platform.dylib) + 0  [0x1984ad050]
+            + ! 2 DYLD-STUB$$_platform_bzero  (in libsystem_malloc.dylib) + 12  [0x1982d8460]
+            + 2 DYLD-STUB$$free  (in req_profile) + 4  [0x104543018]
+            144 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1492  [0x10450ce20]  req_profile.rs:12
+            + 108 _xzm_free  (in libsystem_malloc.dylib) + 0,952,...  [0x1982c3744,0x1982c3afc,...]
+            + 27 _free  (in libsystem_malloc.dylib) + 0,76,...  [0x1982d0a2c,0x1982d0a78,...]
+            + 7 free  (in libsystem_malloc.dylib) + 0  [0x19829a6b4]
+            + 1 DYLD-STUB$$free  (in req_profile) + 4  [0x104543018]
+            + 1 _xzm_xzone_madvise_batch  (in libsystem_malloc.dylib) + 436  [0x1982ca1e8]
+            +   1 xzm_reclaim_mark_free_locked  (in libsystem_malloc.dylib) + 116  [0x1982ac724]
+            +     1 mach_vm_reclaim_try_enter  (in libsystem_kernel.dylib) + 296  [0x198473c54]
+            +       1 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1984610fc]
+            142 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2276  [0x10450d130]  req_profile.rs:12
+            + 66 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 260,408,...  [0x1982c7284,0x1982c7318,...]
+            + 27 _xzm_malloc_zone_malloc_type_calloc_entry  (in libsystem_malloc.dylib) + 280,156,...  [0x1982cf274,0x1982cf1f8,...]
+            + 23 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 8,32,...  [0x1982c3094,0x1982c30ac,...]
+            + 12 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,44,...  [0x1982d0040,0x1982d0060,...]
+            + 9 _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+            + ! 6 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+            + ! : 6 xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+            + ! :   5 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+            + ! :   | 5 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            + ! :   |   5 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8  [0x198460cb8]
+            + ! :   1 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 124  [0x1982acdbc]
+            + ! :     1 _xzm_reclaim_mark_used_locked  (in libsystem_malloc.dylib) + 60  [0x1982af2d0]
+            + ! :       1 mach_vm_reclaim_try_cancel  (in libsystem_kernel.dylib) + 0  [0x198473cd0]
+            + ! 2 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 344  [0x1982c924c]
+            + ! : 2 _xzm_xzone_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 232,292  [0x1982c8dcc,0x1982c8e08]
+            + ! 1 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 384  [0x1982c9274]
+            + !   1 _xzm_chunk_list_push  (in libsystem_malloc.dylib) + 96  [0x1982c99d0]
+            + 5 DYLD-STUB$$calloc  (in req_profile) + 4  [0x104542fac]
+            140 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2004  [0x10450d020]  req_profile.rs:12
+            + 138 _platform_memcmp  (in libsystem_platform.dylib) + 280,272,...  [0x1984ab008,0x1984ab000,...]
+            + 2 DYLD-STUB$$memcmp  (in req_profile) + 4  [0x104543054]
+            102 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2688  [0x10450d2cc]  req_profile.rs:12
+            + 45 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 456,88,...  [0x1982c7348,0x1982c71d8,...]
+            + 21 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 8,324,...  [0x1982c3094,0x1982c31d0,...]
+            + 19 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 208,108,...  [0x1982c2cf0,0x1982c2c8c,...]
+            + 13 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,4,...  [0x1982cfe10,0x1982cfe08,...]
+            + 2 DYLD-STUB$$malloc  (in req_profile) + 4  [0x104543048]
+            + 2 _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+            +   2 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+            +     2 xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+            +       1 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 124  [0x1982acdbc]
+            +       : 1 _xzm_reclaim_mark_used_locked  (in libsystem_malloc.dylib) + 60  [0x1982af2d0]
+            +       :   1 mach_vm_reclaim_try_cancel  (in libsystem_kernel.dylib) + 260  [0x198473dd4]
+            +       :     1 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1984610fc]
+            +       1 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+            +         1 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            +           1 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8  [0x198460cb8]
+            71 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2612  [0x10450d280]  req_profile.rs:12
+            + 40 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 408,88,...  [0x1982c7318,0x1982c71d8,...]
+            + 10 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 208,108,...  [0x1982c2cf0,0x1982c2c8c,...]
+            + 10 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 44,12,...  [0x1982cfe30,0x1982cfe10,...]
+            + 8 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 8,184,...  [0x1982c3094,0x1982c3144,...]
+            + 3 DYLD-STUB$$malloc  (in req_profile) + 4,0  [0x104543048,0x104543044]
+            40 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2500  [0x10450d210]  req_profile.rs:12
+            + 39 _platform_memmove  (in libsystem_platform.dylib) + 444,452,...  [0x1984ad53c,0x1984ad544,...]
+            + 1 DYLD-STUB$$memmove  (in req_profile) + 4  [0x10454306c]
+            38 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1332  [0x10450cd80]  req_profile.rs:12
+            + 22 _xzm_free  (in libsystem_malloc.dylib) + 0,952,...  [0x1982c3744,0x1982c3afc,...]
+            + 9 _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+            + ! 9 __bzero  (in libsystem_platform.dylib) + 0,24  [0x1984ad050,0x1984ad068]
+            + 3 _xzm_free  (in libsystem_malloc.dylib) + 728  [0x1982c3a1c]
+            + ! 3 mach_absolute_time  (in libsystem_kernel.dylib) + 108,112  [0x1984610fc,0x198461100]
+            + 2 DYLD-STUB$$free  (in req_profile) + 4  [0x104543018]
+            + 2 _free  (in libsystem_malloc.dylib) + 0,108  [0x1982d0a2c,0x1982d0a98]
+            35 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2996  [0x10450d400]  req_profile.rs:12
+            + 35 alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h36445c69e6e4aac8  (in req_profile) + 136  [0x104515418]  mod.rs:340
+            +   35 alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile) + 204  [0x10453f1bc]  mod.rs:781
+            +     35 _realloc  (in libsystem_malloc.dylib) + 452  [0x1982d0c70]
+            +       35 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x1982d0440]
+            +         19 xzm_realloc  (in libsystem_malloc.dylib) + 884  [0x1982c3630]
+            +         ! 19 _platform_memmove  (in libsystem_platform.dylib) + 88,76  [0x1984ad3d8,0x1984ad3cc]
+            +         13 xzm_realloc  (in libsystem_malloc.dylib) + 864  [0x1982c361c]
+            +         ! 13 mach_vm_copy  (in libsystem_kernel.dylib) + 116  [0x198468bbc]
+            +         !   13 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x198473028]
+            +         !     13 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x198460c34]
+            +         2 xzm_realloc  (in libsystem_malloc.dylib) + 812  [0x1982c35e8]
+            +         ! 2 _xzm_malloc_large_huge  (in libsystem_malloc.dylib) + 272  [0x1982c2e58]
+            +         !   1 xzm_segment_group_alloc_chunk  (in libsystem_malloc.dylib) + 556  [0x1982ad03c]
+            +         !   : 1 _xzm_segment_group_find_and_allocate_chunk  (in libsystem_malloc.dylib) + 448  [0x1982ad648]
+            +         !   :   1 _xzm_segment_group_span_mark_smaller  (in libsystem_malloc.dylib) + 248  [0x1982ae9e8]
+            +         !   :     1 _xzm_reclaim_mark_used_locked  (in libsystem_malloc.dylib) + 60  [0x1982af2d0]
+            +         !   :       1 mach_vm_reclaim_try_cancel  (in libsystem_kernel.dylib) + 260  [0x198473dd4]
+            +         !   :         1 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1984610fc]
+            +         !   1 xzm_segment_group_alloc_chunk  (in libsystem_malloc.dylib) + 264  [0x1982acf18]
+            +         1 xzm_realloc  (in libsystem_malloc.dylib) + 908  [0x1982c3648]
+            +           1 xzm_segment_group_free_chunk  (in libsystem_malloc.dylib) + 792  [0x1982add54]
+            +             1 _xzm_segment_group_span_mark_free  (in libsystem_malloc.dylib) + 104  [0x1982ae4a4]
+            +               1 _xzm_reclaim_mark_free  (in libsystem_malloc.dylib) + 164  [0x1982acc3c]
+            +                 1 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            +                   1 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8  [0x198460cb8]
+            35 req_profile::main::hb5cb2b724026333e  (in req_profile) + 3560  [0x10450d634]  req_profile.rs:12
+            + 24 _xzm_free  (in libsystem_malloc.dylib) + 0,404,...  [0x1982c3744,0x1982c38d8,...]
+            + 6 _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+            + ! 3 __bzero  (in libsystem_platform.dylib) + 0  [0x1984ad050]
+            + ! 2 _platform_memset  (in libsystem_platform.dylib) + 160  [0x1984ad150]
+            + ! 1 DYLD-STUB$$_platform_bzero  (in libsystem_malloc.dylib) + 12  [0x1982d8460]
+            + 3 _free  (in libsystem_malloc.dylib) + 44  [0x1982d0a58]
+            + 1 DYLD-STUB$$free  (in req_profile) + 4  [0x104543018]
+            + 1 _xzm_xzone_madvise_batch  (in libsystem_malloc.dylib) + 436  [0x1982ca1e8]
+            +   1 xzm_reclaim_mark_free_locked  (in libsystem_malloc.dylib) + 116  [0x1982ac724]
+            33 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1340  [0x10450cd88]  req_profile.rs:12
+            + 12 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 408,88,...  [0x1982c7318,0x1982c71d8,...]
+            + 10 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 336,8,...  [0x1982c31dc,0x1982c3094,...]
+            + 6 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 208,160  [0x1982c2cf0,0x1982c2cc0]
+            + 5 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,80,...  [0x1982cfe10,0x1982cfe54,...]
+            29 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1300  [0x10450cd60]  req_profile.rs:12
+            + 16 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 828,456,...  [0x1982c74bc,0x1982c7348,...]
+            + 7 _xzm_malloc_zone_malloc_type_calloc_entry  (in libsystem_malloc.dylib) + 156,204,...  [0x1982cf1f8,0x1982cf228,...]
+            + 2 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,104  [0x1982d0040,0x1982d009c]
+            + 2 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 324,336  [0x1982c31d0,0x1982c31dc]
+            + 2 _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+            +   2 _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+            +     2 xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+            +       2 _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+            +         2 mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+            +           2 mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 8  [0x198460cb8]
+            28 _xzm_free  (in libsystem_malloc.dylib) + 1352  [0x1982c3c8c]
+            23 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1084  [0x10450cc88]  req_profile.rs:12
+            + 14 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 408,260,...  [0x1982c7318,0x1982c7284,...]
+            + 4 _xzm_malloc_zone_malloc_type_calloc_entry  (in libsystem_malloc.dylib) + 36,0,...  [0x1982cf180,0x1982cf15c,...]
+            + 3 _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 192,32  [0x1982c314c,0x1982c30ac]
+            + 2 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,104  [0x1982d0040,0x1982d009c]
+            23 req_profile::main::hb5cb2b724026333e  (in req_profile) + 3416  [0x10450d5a4]  req_profile.rs:12
+            + 18 _xzm_free  (in libsystem_malloc.dylib) + 28,952,...  [0x1982c3760,0x1982c3afc,...]
+            + 4 _free  (in libsystem_malloc.dylib) + 0,12,...  [0x1982d0a2c,0x1982d0a38,...]
+            + 1 DYLD-STUB$$free  (in req_profile) + 4  [0x104543018]
+            19 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2840  [0x10450d364]  req_profile.rs:12
+            + 14 _platform_memmove  (in libsystem_platform.dylib) + 428,0,...  [0x1984ad52c,0x1984ad380,...]
+            + 5 DYLD-STUB$$memcpy  (in req_profile) + 4  [0x104543060]
+            14 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2916  [0x10450d3b0]  req_profile.rs:12
+            + 12 _platform_memmove  (in libsystem_platform.dylib) + 428,452,...  [0x1984ad52c,0x1984ad544,...]
+            + 2 DYLD-STUB$$memcpy  (in req_profile) + 4  [0x104543060]
+            13 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2740  [0x10450d300]  req_profile.rs:12
+            + 10 _platform_memmove  (in libsystem_platform.dylib) + 428,0,...  [0x1984ad52c,0x1984ad380,...]
+            + 3 DYLD-STUB$$memcpy  (in req_profile) + 4  [0x104543060]
+            10 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1288  [0x10450cd54]  req_profile.rs:12
+            + 9 _platform_memmove  (in libsystem_platform.dylib) + 428,452,...  [0x1984ad52c,0x1984ad544,...]
+            + 1 DYLD-STUB$$memcpy  (in req_profile) + 4  [0x104543060]
+            7 req_profile::main::hb5cb2b724026333e  (in req_profile) + 712  [0x10450cb14]  req_profile.rs:12
+            + 4 _platform_memmove  (in libsystem_platform.dylib) + 460,428,...  [0x1984ad54c,0x1984ad52c,...]
+            + 3 DYLD-STUB$$memcpy  (in req_profile) + 4  [0x104543060]
+            4 req_profile::main::hb5cb2b724026333e  (in req_profile) + 908  [0x10450cbd8]  req_profile.rs:12
+            + 4 _platform_memmove  (in libsystem_platform.dylib) + 452,428,...  [0x1984ad544,0x1984ad52c,...]
+            4 req_profile::main::hb5cb2b724026333e  (in req_profile) + 2812  [0x10450d348]  req_profile.rs:12
+            + 4 _platform_memmove  (in libsystem_platform.dylib) + 428,12,...  [0x1984ad52c,0x1984ad38c,...]
+            3 requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile) + 1200,1208  [0x104515904,0x10451590c]  blake2b.rs:86
+            2 req_profile::main::hb5cb2b724026333e  (in req_profile) + 1200  [0x10450ccfc]  req_profile.rs:12
+            + 2 __bzero  (in libsystem_platform.dylib) + 24  [0x1984ad068]
+            1 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile) + 168  [0x10453f29c]  mod.rs:560
+
+Total number in stack (recursive counted multiple, when >=5):
+        114       _platform_memcmp  (in libsystem_platform.dylib) + 0  [0x1984aaef0]
+        20       _platform_memmove  (in libsystem_platform.dylib) + 0  [0x1984ad380]
+        15       core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 92  [0x1045147d0]  pivot.rs:67
+        12       DYLD-STUB$$memcmp  (in req_profile) + 0  [0x104543050]
+        12       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 0  [0x104513b54]  quicksort.rs:27
+        12       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 0  [0x104513b54]  quicksort.rs:62
+        12       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 668  [0x104513df0]  quicksort.rs:62
+        12       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 856  [0x104513eac]  quicksort.rs:75
+        11       core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 120  [0x1045147ec]  pivot.rs:68
+        10       core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 148  [0x104514808]  pivot.rs:69
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1540  [0x104514158]  quicksort.rs:27
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1788  [0x104514250]  quicksort.rs:27
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1884  [0x1045142b0]  quicksort.rs:27
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2012  [0x104514330]  quicksort.rs:27
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 2104  [0x10451438c]  quicksort.rs:27
+        10       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 384  [0x104513cd4]  quicksort.rs:39
+        9       _xzm_free  (in libsystem_malloc.dylib) + 0  [0x1982c3744]
+        9       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 748  [0x104513e40]  quicksort.rs:62
+        8       _xzm_xzone_malloc  (in libsystem_malloc.dylib) + 0  [0x1982c308c]
+        8       _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 0  [0x1982c7180]
+        8       core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 248  [0x10451486c]  pivot.rs:71
+        8       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 1448  [0x1045140fc]  quicksort.rs:27
+        7       core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile) + 212  [0x104514848]  pivot.rs:71
+        7       core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile) + 132  [0x104513bd8]  quicksort.rs:27
+        7       mach_absolute_time  (in libsystem_kernel.dylib) + 0  [0x198461090]
+        6       __bzero  (in libsystem_platform.dylib) + 0  [0x1984ad050]
+        6       core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 124  [0x104514610]  smallsort.rs:627
+        6       mach_vm_reclaim_update_kernel_accounting  (in libsystem_kernel.dylib) + 92  [0x198473f74]
+        6       mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib) + 0  [0x198460cb0]
+        5       <deduplicated_symbol>  (in libsystem_malloc.dylib) + 0  [0x1982c2c20]
+        5       DYLD-STUB$$free  (in req_profile) + 0  [0x104543014]
+        5       DYLD-STUB$$memcpy  (in req_profile) + 0  [0x10454305c]
+        5       _free  (in libsystem_malloc.dylib) + 0  [0x1982d0a2c]
+        5       _xzm_free  (in libsystem_malloc.dylib) + 348  [0x1982c38a0]
+        5       _xzm_reclaim_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acdf0]
+        5       _xzm_xzone_find_and_malloc_from_freelist_chunk  (in libsystem_malloc.dylib) + 952  [0x1982c94ac]
+        5       _xzm_xzone_malloc_freelist_outlined  (in libsystem_malloc.dylib) + 324  [0x1982c8940]
+        5       core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile) + 204  [0x104514660]  smallsort.rs:641
+        5       xzm_chunk_mark_used  (in libsystem_malloc.dylib) + 176  [0x1982acd08]
+
+Sort by top of stack, same collapsed (when >= 5):
+        _platform_memcmp  (in libsystem_platform.dylib)        1092
+        req_profile::main::hb5cb2b724026333e  (in req_profile)        839
+        _xzm_free  (in libsystem_malloc.dylib)        413
+        core::slice::sort::stable::quicksort::quicksort::h6ec27f518adc7f32  (in req_profile)        386
+        requihash::blake2b::compress::he6e23f9f25ce3836  (in req_profile)        283
+        _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib)        229
+        _platform_memmove  (in libsystem_platform.dylib)        224
+        _xzm_xzone_malloc  (in libsystem_malloc.dylib)        83
+        mach_absolute_time  (in libsystem_kernel.dylib)        78
+        xzm_realloc  (in libsystem_malloc.dylib)        67
+        _free  (in libsystem_malloc.dylib)        66
+        <deduplicated_symbol>  (in libsystem_malloc.dylib)        51
+        xzm_malloc_zone_size  (in libsystem_malloc.dylib)        43
+        _xzm_malloc_zone_malloc_type_calloc_entry  (in libsystem_malloc.dylib)        38
+        __bzero  (in libsystem_platform.dylib)        30
+        _malloc_zone_malloc  (in libsystem_malloc.dylib)        28
+        _realloc  (in libsystem_malloc.dylib)        26
+        core::slice::sort::stable::drift::sort::h8c65ca255b9b115d  (in req_profile)        25
+        _malloc_zone_realloc  (in libsystem_malloc.dylib)        22
+        alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he476265f797836f4  (in req_profile)        21
+        alloc::raw_vec::finish_grow::hce20489344c2c48d  (in req_profile)        19
+        mach_vm_reclaim_update_kernel_accounting_trap  (in libsystem_kernel.dylib)        18
+        DYLD-STUB$$memcmp  (in req_profile)        16
+        _malloc_zone_calloc  (in libsystem_malloc.dylib)        16
+        _platform_memset  (in libsystem_platform.dylib)        15
+        DYLD-STUB$$memcpy  (in req_profile)        14
+        mach_msg2_trap  (in libsystem_kernel.dylib)        13
+        realloc  (in libsystem_malloc.dylib)        12
+        core::slice::sort::shared::pivot::median3_rec::h9874e50347a56e33  (in req_profile)        11
+        core::slice::sort::shared::smallsort::sort4_stable::hd5be814016d2afd9  (in req_profile)        8
+        DYLD-STUB$$_platform_bzero  (in libsystem_malloc.dylib)        7
+        DYLD-STUB$$_platform_memmove  (in libsystem_malloc.dylib)        7
+        DYLD-STUB$$free  (in req_profile)        7
+        free  (in libsystem_malloc.dylib)        7
+        DYLD-STUB$$calloc  (in req_profile)        5
+        DYLD-STUB$$malloc  (in req_profile)        5
+
+Binary Images:
+       0x10450c000 -        0x10454f67f +req_profile (0) <50285A95-EB05-3C55-A81A-4C62EFDD1B1A> /Users/*/req_profile
+       0x19804c000 -        0x19809f4bb  libobjc.A.dylib (951.1) <9E66CFF2-3EBD-3242-8166-D5D0C204755B> /usr/lib/libobjc.A.dylib
+       0x1980a0000 -        0x1980d0bcb  libdyld.dylib (1340) <D0CBB392-9301-3174-8904-D869F1D973CF> /usr/lib/system/libdyld.dylib
+       0x1980d1000 -        0x198170713  dyld (1.0.0 - 1340) <BC4DB5F4-1C64-3706-8006-73B78C3E1F1A> /usr/lib/dyld
+       0x198171000 -        0x1981741d0  libsystem_blocks.dylib (96) <F1D9FC62-B5CE-3FB6-B264-B1933396C05F> /usr/lib/system/libsystem_blocks.dylib
+       0x198175000 -        0x1981ca07f  libxpc.dylib (3089.80.10) <3B264F68-2825-3790-8796-4B49581D6425> /usr/lib/system/libxpc.dylib
+       0x1981cb000 -        0x1981eb95f  libsystem_trace.dylib (1815.80.2) <2CE5667A-97C5-35F3-8124-BB48185D0D3D> /usr/lib/system/libsystem_trace.dylib
+       0x1981ec000 -        0x198298ccf  libcorecrypto.dylib (1922.80.7) <A6FB5220-05F1-36A3-93CA-E45F15C98D3A> /usr/lib/system/libcorecrypto.dylib
+       0x198299000 -        0x1982e4c67  libsystem_malloc.dylib (792.80.2) <221D1476-49F1-3370-A1DE-82991ACDB932> /usr/lib/system/libsystem_malloc.dylib
+       0x1982e5000 -        0x19832be5f  libdispatch.dylib (1542.0.4) <4C58AB31-F363-3E75-A8F8-302105812DBF> /usr/lib/system/libdispatch.dylib
+       0x19832c000 -        0x19832efeb  libsystem_featureflags.dylib (101) <36BE75BA-0B53-3ACA-ABAF-C639D711C90B> /usr/lib/system/libsystem_featureflags.dylib
+       0x19832f000 -        0x1983b1047  libsystem_c.dylib (1725.40.4) <EB569350-0696-3397-838E-0344948107C0> /usr/lib/system/libsystem_c.dylib
+       0x1983b2000 -        0x198444ea3  libc++.1.dylib (2000.67) <2DCB82A8-F83C-3656-B99E-B22415EA2AAA> /usr/lib/libc++.1.dylib
+       0x198445000 -        0x19845f92f  libc++abi.dylib (2000.67) <581F1CC9-CE04-30EF-AB06-1638E36161A7> /usr/lib/libc++abi.dylib
+       0x198460000 -        0x19849c49f  libsystem_kernel.dylib (12377.81.4) <B809799C-0EC9-3EE1-B730-342BDBF14E03> /usr/lib/system/libsystem_kernel.dylib
+       0x19849d000 -        0x1984a9acb  libsystem_pthread.dylib (539.80.3) <0596A7B6-BCE2-3F06-A2E8-3EAAB5371ED8> /usr/lib/system/libsystem_pthread.dylib
+       0x1984aa000 -        0x1984b24af  libsystem_platform.dylib (359.80.2) <62C9CD37-272D-3D2D-9A1C-6F4EF24F7EC7> /usr/lib/system/libsystem_platform.dylib
+       0x1984b3000 -        0x1984e2e23  libsystem_info.dylib (600) <05CCB208-0B54-38D8-B736-6C7043F446AA> /usr/lib/system/libsystem_info.dylib
+       0x19c45c000 -        0x19c466397  libsystem_darwin.dylib (1725.40.4) <EAC9A3D8-2048-3E6A-BA11-77D1C25C0EF3> /usr/lib/system/libsystem_darwin.dylib
+       0x19c8cd000 -        0x19c8deff3  libsystem_notify.dylib (344.0.1) <73D7BFA7-9433-3ECD-929F-06220C37F214> /usr/lib/system/libsystem_notify.dylib
+       0x19eba8000 -        0x19ebc2fdb  libsystem_networkextension.dylib (2205.81.1) <645A9697-79B5-3E35-A642-5FFDD53CB6A7> /usr/lib/system/libsystem_networkextension.dylib
+       0x19ec46000 -        0x19ec5dff3  libsystem_asl.dylib (406) <2A30FE38-5014-334B-941B-579054EA8C1E> /usr/lib/system/libsystem_asl.dylib
+       0x1a0802000 -        0x1a080a3b7  libsystem_symptoms.dylib (2158.80.11) <ED7EEE1F-0CA6-30CF-9A27-7440EE0661BC> /usr/lib/system/libsystem_symptoms.dylib
+       0x1a47bf000 -        0x1a47f72bb  libsystem_containermanager.dylib (725.80.5) <9FC7766C-6828-3EA2-9C9A-B209892A0186> /usr/lib/system/libsystem_containermanager.dylib
+       0x1a5c15000 -        0x1a5c1966f  libsystem_configuration.dylib (1385.80.4) <E5837A49-4BF9-3D25-8671-A6174223010A> /usr/lib/system/libsystem_configuration.dylib
+       0x1a5c1a000 -        0x1a5c206a7  libsystem_sandbox.dylib (2680.80.20) <8875D51A-D22D-3A6B-9A17-8D565C96262C> /usr/lib/system/libsystem_sandbox.dylib
+       0x1a71b3000 -        0x1a71b61fb  libquarantine.dylib (196.40.3) <84049E82-ACDC-39F3-A2D7-6ECB912B825A> /usr/lib/system/libquarantine.dylib
+       0x1a7943000 -        0x1a794a00b  libsystem_coreservices.dylib (191.3.3) <94151A03-8600-3318-8719-103E2D5E83A5> /usr/lib/system/libsystem_coreservices.dylib
+       0x1a7e9d000 -        0x1a7eda8b7  libsystem_m.dylib (3309) <60DE08CC-AE4B-33E5-85E6-8E96D95ED4D8> /usr/lib/system/libsystem_m.dylib
+       0x1a7edc000 -        0x1a7edf537  libmacho.dylib (1030.6.3) <D84C5B4C-6EE5-3B2D-8B96-DCA5B83EC11D> /usr/lib/system/libmacho.dylib
+       0x1a7ef9000 -        0x1a7f0661f  libcommonCrypto.dylib (600035) <04C03765-D34A-311F-AE1E-CFBB1E627E54> /usr/lib/system/libcommonCrypto.dylib
+       0x1a7f07000 -        0x1a7f10b0b  libunwind.dylib (1900.125) <8DC5F6C2-CDA9-3B93-AC35-ED584D2C9550> /usr/lib/system/libunwind.dylib
+       0x1a7f19000 -        0x1a7f236ff  libcopyfile.dylib (230.0.1.0.1) <BCF5BEF5-BC4A-3CCE-9D0D-89C57F45CBFB> /usr/lib/system/libcopyfile.dylib
+       0x1a7f24000 -        0x1a7f2795f  libcompiler_rt.dylib (103.3) <85CAE852-081B-3124-89C1-4C4A21830160> /usr/lib/system/libcompiler_rt.dylib
+       0x1a7f28000 -        0x1a7f2ca1b  libsystem_collections.dylib (1725.40.4) <17BD45DA-1D82-3A90-9F18-5D569A5693B5> /usr/lib/system/libsystem_collections.dylib
+       0x1a7f2d000 -        0x1a7f304bf  libsystem_secinit.dylib (168.40.2) <0928D7E4-5DB0-3B75-9DF5-08EC8E9C033B> /usr/lib/system/libsystem_secinit.dylib
+       0x1a7f31000 -        0x1a7f33b57  libremovefile.dylib (84) <D854E7F8-C351-331B-9A26-BE66F9B8996D> /usr/lib/system/libremovefile.dylib
+       0x1a7f34000 -        0x1a7f34f27  libkeymgr.dylib (31) <18ED97A3-6DD7-3EC2-AB38-E16A862BE1A7> /usr/lib/system/libkeymgr.dylib
+       0x1a7f35000 -        0x1a7f3df8f  libsystem_dnssd.dylib (2881.80.4.0.1) <EB84C040-D153-37D3-A933-8AD3CFD893BA> /usr/lib/system/libsystem_dnssd.dylib
+       0x1a7f3e000 -        0x1a7f430b3  libcache.dylib (95) <EA56E91F-7683-3AA5-AF72-185994622502> /usr/lib/system/libcache.dylib
+       0x1a7f44000 -        0x1a7f45cf3  libSystem.B.dylib (1356) <6AE3A2BD-839C-3DEA-854C-1C4A10567C26> /usr/lib/libSystem.B.dylib
+       0x2963cd000 -        0x2963d4319  libRosetta.dylib (367.3) <5315C55D-09E5-394B-A9E5-672B23847BF7> /usr/lib/libRosetta.dylib
+       0x297ada000 -        0x297adddeb  libsystem_darwindirectory.dylib (122) <9AD833C7-D009-39FF-8D04-D57C937D9EAC> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x297ade000 -        0x297ae734b  libsystem_eligibility.dylib (289.80.56) <0E973CB5-A124-3716-9841-1EA67809AF06> /usr/lib/system/libsystem_eligibility.dylib
+       0x297ae8000 -        0x297aef873  libsystem_sanitizers.dylib (25) <90C45178-3954-3108-9F2F-44E528DF5E44> /usr/lib/system/libsystem_sanitizers.dylib
+       0x297af0000 -        0x297af0bb7  libsystem_trial.dylib (474.2.0.5.2) <E776BAEB-B36B-3EA2-BEFE-3E2F7999E235> /usr/lib/system/libsystem_trial.dylib

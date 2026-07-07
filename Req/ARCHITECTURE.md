@@ -1,0 +1,226 @@
+# ARCHITECTURE.md — Mix-and-Match Backend Structure for Req
+
+This proposes a code structure that lets the hash primitive and the solver
+backend be swapped freely across three implementation tiers — a linear reference,
+a parallelized native implementation, and special-instruction / hardware-
+accelerated paths — without the consensus-critical logic (encoding, tree
+validation, difficulty) knowing or caring which is in use.
+
+The design is not invented from scratch; it is the union of two patterns already
+proven in the reference codebases this project borrows from:
+
+- zcash `src/crypto/sha256.cpp`: **function-pointer dispatch selected once at
+  startup** by `SHA256AutoDetect()`, with named backends (`sha256_sse4`,
+  `sha256_avx2`, `sha256_shani`) each exporting `Transform` and batched
+  `Transform_Nway` variants, every candidate **self-tested before adoption**.
+- zebra / `blake2b_simd`: **runtime CPU feature detection inside a fat binary**
+  that ships scalar + SSE4.1 + AVX2 and dispatches to the fastest, plus a
+  **`hash_many` batched API** that is the real throughput lever for mining.
+
+## 1. The two seams
+
+Only two things vary across tiers; everything else is fixed. Name the seams
+precisely and the rest of the system is backend-agnostic.
+
+**Seam A — the hash primitive.** Requihash needs exactly two operations from its
+hash, and they are different enough to separate:
+
+- `hash_one(person, prefix, leaf) -> digest` — a single leaf. Latency-bound.
+  Used by the *verifier* (2^k leaves) and by small-parameter tests.
+- `hash_many(person, prefix, leaves[]) -> digests[]` — a batch of independent
+  leaves. Throughput-bound. Used by the *miner* (2^(ell+1) leaves). This is where
+  SIMD lanes, GPU warps, and dataflow tiles actually pay off, because Requihash's
+  regularity keying (`leaf -> (leaf mod k, leaf / k)`) makes every leaf
+  independent — embarrassingly parallel by construction.
+
+**Seam B — the solver backend.** Wagner's tree search over the generated leaves:
+
+- `solve(engine, base) -> Vec<solution>` — reference (scalar, one-list-at-a-time),
+  native-parallel (bucket-partitioned, multi-threaded), or offloaded (GPU/FPGA).
+
+Note on emphasis: BENCHMARK.md measures that at these parameters the *merge*
+(Seam B), dominated by per-row allocation, is 76-87% of solve time, while leaf
+hashing (Seam A) is only 13-24% and falling with n. So although both are seams,
+the profile says the first optimization effort belongs on Seam B (arena
+allocation, radix bucketing) — batched-SIMD hashing on Seam A is the third win,
+not the first. The seam structure is unchanged; the priority ordering is the
+correction the data forced.
+
+The verifier is deliberately *not* a seam. It stays single, scalar, portable, and
+auditable, because it is the consensus-critical path (HardwareBridge.md: "verification
+must stay boring"). A miner may be exotic; a verifier may not.
+
+## 2. Trait / interface at each seam
+
+Express each seam as a narrow interface the rest of the code programs against.
+
+### Rust
+
+```rust
+/// Seam A: the hash primitive. Implementors provide one-shot and batched leaf
+/// hashing; the batched default falls back to a loop over hash_one so a new
+/// backend only has to implement the fast path when it has one.
+pub trait LeafHasher: Send + Sync {
+    /// Digest length this backend emits (must equal Params::hash_output()).
+    fn output_len(&self) -> usize;
+
+    /// One leaf: H(person || prefix || le32(class) || le32(counter)).
+    fn hash_one(&self, person: &[u8; 16], prefix: &[u8], class: u32, counter: u32,
+                out: &mut [u8]);
+
+    /// A batch of leaves. `keys` are (class, counter) pairs; `out` is
+    /// keys.len() * output_len() bytes. Default = serial hash_one.
+    fn hash_many(&self, person: &[u8; 16], prefix: &[u8],
+                 keys: &[(u32, u32)], out: &mut [u8]) {
+        let n = self.output_len();
+        for (i, &(c, j)) in keys.iter().enumerate() {
+            self.hash_one(person, prefix, c, j, &mut out[i * n..(i + 1) * n]);
+        }
+    }
+
+    /// Human-readable backend name, for logging the selected path.
+    fn name(&self) -> &'static str;
+}
+
+/// Seam B: the solver backend. The verifier is intentionally not part of this.
+pub trait Solver {
+    fn solve(&self, engine: &Requihash, hasher: &dyn LeafHasher) -> Vec<Vec<EhIndex>>;
+    fn name(&self) -> &'static str;
+}
+```
+
+### C++
+
+```cpp
+// Seam A: match zcash's function-pointer style so a backend is a struct of fn
+// pointers, selected at startup and self-tested.
+struct LeafHasher {
+    size_t output_len;
+    const char* name;
+    void (*hash_one)(const uint8_t person[16], const uint8_t* prefix, size_t plen,
+                     uint32_t cls, uint32_t counter, uint8_t* out);
+    // out = count * output_len bytes; keys = count*2 u32s (class,counter interleaved)
+    void (*hash_many)(const uint8_t person[16], const uint8_t* prefix, size_t plen,
+                      const uint32_t* keys, size_t count, uint8_t* out);
+};
+
+// Seam B
+struct Solver {
+    const char* name;
+    std::vector<std::vector<eh_index>> (*solve)(const Requihash&, const LeafHasher&);
+};
+```
+
+## 3. Selection: detect once, self-test, freeze
+
+Copy zcash's discipline exactly — pick the backend once at startup, prove it
+against the reference before trusting it, then never branch per-call.
+
+```rust
+/// Returns the fastest LeafHasher the platform supports, after checking it
+/// agrees with the scalar reference on a fixed known-answer vector.
+pub fn autodetect_hasher() -> Box<dyn LeafHasher> {
+    let reference = Blake2bScalar::new();
+    let candidates: Vec<Box<dyn LeafHasher>> = vec![
+        #[cfg(target_arch = "x86_64")] maybe_avx2(),      // None if unsupported
+        #[cfg(target_arch = "aarch64")] maybe_neon_batch(),
+        Some(Box::new(Blake2bSimdMany::new())),           // crate-backed, portable
+    ].into_iter().flatten().collect();
+
+    for c in candidates {
+        if agrees_with_reference(&reference, c.as_ref()) {   // <-- self-test gate
+            log::info!("Req leaf hasher: {}", c.name());
+            return c;
+        }
+        log::warn!("Req leaf hasher {} failed self-test, skipping", c.name());
+    }
+    Box::new(reference)
+}
+```
+
+The self-test gate is not optional: a SIMD or GPU backend that is 1 bit off
+silently forks consensus. zcash asserts `SelfTest()` inside `SHA256AutoDetect()`
+for exactly this reason, and Requihash inherits the requirement because the leaf
+hash feeds the validity check directly (Equihash.md F-A1: the whole scheme lives
+or dies at the hash-to-leaf boundary).
+
+## 4. Directory layout
+
+```
+Req/
+  common/                     # tier-independent, shared by C++ and Rust semantics
+    SPEC.md                   # the frozen wire format + regularity constraint
+    vectors/                  # cross-language known-answer + solution vectors
+
+  cpp/
+    requihash.h               # params, encoding, GenerateHash contract (Seam A caller)
+    verify.h                  # THE verifier — scalar, single, never a seam
+    hash/
+      blake2b_ref.h           # tier 1: linear reference (current blake2b.h)
+      blake2b_sse.cpp         # tier 3: SSE4.1/AVX2 (borrow zcash sha256_* pattern
+      blake2b_neon.cpp        #          or link libb2 / BLAKE3 team's blake2)
+      dispatch.cpp            # autodetect + self-test, sets the LeafHasher struct
+    solve/
+      solve_ref.h             # tier 1: scalar Wagner (current solver.h)
+      solve_native.cpp        # tier 2: bucket-partitioned, std::thread / OpenMP
+      solve_cuda.cu           # tier 3: optional, offloads hash_many + bucketing
+    CMakeLists.txt            # feature flags: REQ_ENABLE_AVX2, REQ_ENABLE_CUDA...
+
+  rust/
+    src/
+      lib.rs                  # params, encoding, verifier (Seam-agnostic core)
+      hash/
+        mod.rs                # LeafHasher trait + autodetect
+        scalar.rs             # tier 1: linear reference (current blake2b.rs)
+        simd.rs               # tier 3: blake2b_simd many::hash_many wrapper
+      solve/
+        mod.rs                # Solver trait
+        reference.rs          # tier 1
+        rayon.rs              # tier 2: rayon bucket-parallel
+    Cargo.toml                # features = ["simd", "rayon", "cuda"]
+```
+
+Two rules keep the seams honest. The verifier (`verify.h`, `lib.rs` verify path)
+depends on **only** the reference hasher — never on `dispatch`/`autodetect` — so a
+broken accelerated backend cannot reach consensus validation. And `SPEC.md` plus
+`common/vectors/` are the contract every tier is tested against, so "does the AVX2
+miner agree with the scalar verifier" is a mechanical check, not a hope.
+
+## 5. Feature-flag matrix
+
+Tiers compile in or out; the default build is reference-only and dependency-free.
+
+| Cargo/CMake feature | Tier | Backend | Falls back to |
+|---|---|---|---|
+| (none) | 1 | scalar BLAKE2b, scalar Wagner | — |
+| `simd` / `REQ_ENABLE_AVX2` | 3 | `blake2b_simd` hash_many / AVX2 | scalar, at runtime, via self-test |
+| `rayon` / `REQ_OPENMP` | 2 | bucket-parallel solver | reference solver |
+| `neon` (aarch64) | 3 | batched leaf hashing | scalar |
+| `cuda` / `REQ_ENABLE_CUDA` | 3 | GPU hash_many + bucketing | native, if no device |
+
+Runtime, not just compile-time, fallback matters: a binary built with `simd`
+still runs on a machine without AVX2 because `autodetect_hasher()` drops any
+candidate that fails detection or self-test. This is the `blake2b_simd`
+fat-binary model.
+
+## 6. Why this shape and not an enum or generic
+
+Three alternatives were considered and rejected:
+
+- **`#[cfg]` at every call site** — scatters the backend choice across the solver
+  and makes the "verifier uses only the reference" invariant unenforceable. The
+  seam collapses.
+- **Generic `Solver<H: LeafHasher>` monomorphized** — fine for the miner, but the
+  runtime-detected hasher is a `dyn` object by nature (the CPU decides at
+  startup), so a trait object at Seam A is the honest type. The per-leaf virtual
+  call is amortized by `hash_many` operating on whole batches, not one leaf.
+- **Depend on one SIMD crate and stop** — good for Rust today, but forecloses the
+  hardware tier (F-X1's convergent MAC substrate, GPU/FPGA offload) and the C++
+  side. The trait keeps that door open at the cost of one indirection.
+
+The structure costs one function-pointer indirection per *batch* (not per leaf)
+and one startup detection. In exchange, the same core encoding + verifier +
+difficulty logic is written once and every acceleration tier — present and future,
+CPU SIMD through the inference-hardware MAC arrays of HardwareBridge.md F-X1 —
+plugs into the two named seams behind a self-test gate.
+```

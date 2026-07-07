@@ -1,0 +1,36 @@
+[package]
+name = "requihash"
+version = "0.1.0"
+edition = "2021"
+description = "Requihash miner and verifier (Zebra-style), regularity-repaired Equihash"
+
+[lib]
+name = "requihash"
+path = "src/lib.rs"
+
+[[bin]]
+name = "req_xcheck"
+path = "src/bin/req_xcheck.rs"
+
+[[bin]]
+name = "req_bench"
+path = "src/bin/req_bench.rs"
+
+[[bin]]
+name = "req_profile"
+path = "src/bin/req_profile.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = true    # keep symbols so `sample` can attribute merge-internal time
+
+[features]
+default = []
+rayon = ["dep:rayon"]
+simd = ["dep:blake2b_simd"]
+
+[dependencies]
+rayon = { version = "1", optional = true }
+blake2b_simd = { version = "1", optional = true }
