@@ -115,6 +115,46 @@ Concrete, ordered by value:
    lower bound (F-A6) — the theorem the empirical steepness should not be able to
    beat.
 
+### 3a. Method refinement: counting first, wall-clock second (2026-07-12)
+
+The exponent `s` is a property of the algorithm, not the hardware, so it falls
+out of deterministic accounting — no benchmark noise, no machine dependence,
+fully reproducible. The harness should emit **counters, not timings**, as the
+primary instrument:
+
+- hashes computed, split generation vs recomputation,
+- bytes read/written **by stride class** (sequential vs bucket-random vs
+  pointer-chase — the classes a memory controller prices differently),
+- peak bytes resident,
+
+per (variant × hash-function × iteration-count m × memory-cap q); fitting `s`
+is a slope over counted recomputations. Wall-clock runs are demoted to one
+calibration per hardware class: the weight vector (ns and nJ per hash, per
+random access, per sequential byte) that converts counts into adversary
+economics. The counters are designed to catch the two things naive counting
+misses: access-pattern regularity (the index-pointer technique changes zero
+hash calls — its effect lives entirely in the stride-class distribution, which
+is what made it ASIC-relevant) and strategy diversity (the claim under test is
+"no strategy beats q^{k/2}", so the harness enumerates strategies — bucket
+shedding policies, the class-resident layouts of SECURITY_ANALYSIS.md H1 — and
+counts each; experiment 3's adversarial pass is a search over strategies, each
+then evaluated deterministically).
+
+Two experiment axes join the sweep, from the Zebro D3 direction (era-scoped PoW
+fields; `~/Work/ZK/Zebro/CONSENSUS.md` §2.2):
+
+5. **Iterated generator (`x_j = H^m(...)`).** m multiplies the recomputation
+   term specifically (honest solver: m× once at generation; TMTO adversary: m×
+   per recomputation), so measured `s_eff` should rise with m — while m also
+   shifts the gen/merge split toward hashing, degenerating toward hashcash at
+   large m. The sweep quantifies both slopes and locates the useful m window;
+   consensus-side the verification budget bounds it (`2^k · m` hashes per
+   verify).
+6. **BLAKE3 backend.** The same counters under a blake3 generator (XOF-native
+   output, `derive_key` domain separation): confirms a hash swap moves only the
+   generation constant, not the steepness — and prices the miner-kernel-reset
+   trade with numbers instead of opinions.
+
 ## 4. Summary
 
 | 2017 result | What it established | Implication for Req |
