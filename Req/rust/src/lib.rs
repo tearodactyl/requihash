@@ -11,6 +11,7 @@
 mod blake2b;
 
 pub mod hash;
+pub mod report;
 pub mod solve;
 pub mod verify;
 

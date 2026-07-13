@@ -4,12 +4,32 @@ Measured on Apple Silicon (aarch64), scalar reference backend, `--release`
 (opt-level 3, LTO, 1 codegen unit). Reproduce with:
 
     cargo run --release --manifest-path rust/Cargo.toml --bin req_bench
+    # machine-readable records + baseline tracking (see "Regression workflow"):
+    cargo run --release --manifest-path rust/Cargo.toml --bin req_bench -- \
+        --json baselines/<tag>.jsonl --tag <tag>
+    cargo run --release --manifest-path rust/Cargo.toml --bin req_bench -- \
+        --baseline baselines/<tag>.jsonl
     # profiling:
     cargo build --release --manifest-path rust/Cargo.toml --bin req_profile
     rust/target/release/req_profile &  ; sample <pid> 5 -f prof.txt ; kill %1
 
-Evidence grade: Measured (harness committed as `rust/src/bin/req_bench.rs` and
-`req_profile.rs`).
+Evidence grade: Measured (harness committed as `rust/src/bin/req_bench.rs`,
+`req_profile.rs`; statistics and comparison rules in `rust/src/report.rs`).
+
+**Regression workflow** (the §5 gap-3 discipline, implemented): every bench
+emits a JSON-lines record (min/median/MAD over warm reps; warm-up by time
+budget so microbenches get scheduled and ramped before sampling). A baseline
+file holds several appended runs; comparison is against the per-key *median of
+run-minima* with the decision band max(MADs, 5% of baseline) — the floor was
+set empirically: same-code cross-process spread on an unpinned laptop reached
+~5-7%, far above within-run MAD, and best-of-N baselines proved wrong-shaped
+(typical runs sit above a best-ever floor, flagging phantom regressions).
+Resolution tiers that follow: within-process seam comparisons (backends
+interleaved in one run) resolve ~1%; cross-process baseline tracking resolves
+the band; any verdict at the band edge counts only if it reproduces on a second
+run. Single-rep records (the instrumented solve's phase splits) are never
+tracked — their ratios are the datum. Committed baselines live in
+`baselines/`, tagged per machine.
 
 ## 1. Headline numbers
 

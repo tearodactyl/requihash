@@ -1,84 +1,62 @@
 //! Benchmark and profile the Requihash hot paths:
-//!   1. leaf hashing throughput (BLAKE2b, the miner's dominant cost)
+//!   1. leaf hashing throughput (the generator phase in isolation)
 //!   2. full instrumented solve (gen vs merge split, per-round list sizes)
 //!   3. verifier throughput (the consensus-critical latency path)
+//!   4. backend families: solvers, verifiers, hash backends (seams A/B)
 //!
-//! Run with:  cargo run --release --bin req_bench
-//! Uses only std::time; no external bench framework so it builds dependency-free.
+//! Run with:  cargo run --release --bin req_bench [-- OPTIONS]
+//!   --json <path>       append machine-readable records (JSON lines)
+//!   --baseline <path>   compare this run against a saved JSONL baseline
+//!   --band-pct <n>      relative noise floor for comparisons (percent)
+//!   --tag <name>        machine tag recorded in emitted lines
+//!
+//! Uses only std::time; no external bench framework so it builds
+//! dependency-free. Statistics and the comparison decision rule live in
+//! `requihash::report` (min + median + MAD; a delta counts only beyond the
+//! MAD band — see BENCHMARK.md §5).
 
+use requihash::report::{compare, load_baseline, BaselineEntry, Record, Verdict};
 use requihash::*;
 use std::time::Instant;
 
-fn median_ns(mut xs: Vec<u128>) -> u128 {
-    xs.sort_unstable();
-    xs[xs.len() / 2]
+fn sample<F: FnMut()>(reps: usize, mut f: F) -> Vec<u128> {
+    // Untimed warm-up by time budget, not call count: a microsecond-scale
+    // bench can finish entirely on an efficiency core before the scheduler
+    // migrates it; keep the core busy long enough to be placed and ramped.
+    let warm = Instant::now();
+    while warm.elapsed().as_millis() < 50 {
+        f();
+    }
+    let mut samples = Vec::with_capacity(reps);
+    for _ in 0..reps {
+        let t = Instant::now();
+        f();
+        samples.push(t.elapsed().as_nanos());
+    }
+    samples
 }
 
-fn bench_leaf_hash(n: u32, k: u32) {
+fn bench_leaf_hash(n: u32, k: u32, out: &mut Vec<Record>) {
     let p = Params::new(n, k).unwrap();
     let eng = Requihash::new(p, b"bench-input", &0u32.to_le_bytes());
     let leaves = 1u64 << (p.collision_bit_length() + 1);
 
-    // warm + measure
-    let mut samples = Vec::new();
-    for _ in 0..5 {
-        let t = Instant::now();
+    let samples = sample(15, || {
         let (rows, count) = eng.hash_all_leaves();
-        let ns = t.elapsed().as_nanos();
         std::hint::black_box(&rows);
         assert_eq!(count as u64, leaves);
-        samples.push(ns);
-    }
-    let ns = median_ns(samples);
-    let per_leaf = ns as f64 / leaves as f64;
-    let rate = leaves as f64 / (ns as f64 / 1e9);
+    });
+    let rec = Record::from_samples("leaf_hash", n, k, leaves, &samples);
     println!(
         "  leaf-hash ({n},{k}): {leaves} leaves in {:.2} ms  |  {:.1} ns/leaf  |  {:.2} M leaves/s",
-        ns as f64 / 1e6,
-        per_leaf,
-        rate / 1e6
+        rec.min_ns as f64 / 1e6,
+        rec.per_unit_ns(),
+        1e3 / rec.per_unit_ns(),
     );
+    out.push(rec);
 }
 
-fn bench_solve_compare(n: u32, k: u32) {
-    let p = Params::new(n, k).unwrap();
-    // find a solving nonce
-    let mut nonce = 0u32;
-    let eng = loop {
-        let e = Requihash::new(p, b"bench-input", &nonce.to_le_bytes());
-        if !e.solve().is_empty() {
-            break e;
-        }
-        nonce += 1;
-        if nonce > 4000 {
-            println!("  ({n},{k}): no solution");
-            return;
-        }
-    };
-    // median of a few runs each
-    let reps = if n >= 96 { 3 } else { 9 };
-    let mut ref_s = Vec::new();
-    let mut arena_s = Vec::new();
-    for _ in 0..reps {
-        let t = Instant::now();
-        std::hint::black_box(eng.solve());
-        ref_s.push(t.elapsed().as_nanos());
-        let t = Instant::now();
-        std::hint::black_box(eng.solve_arena());
-        arena_s.push(t.elapsed().as_nanos());
-    }
-    let r = median_ns(ref_s) as f64 / 1e6;
-    let a = median_ns(arena_s) as f64 / 1e6;
-    println!(
-        "  ({n},{k}): reference {:.2} ms  ->  arena {:.2} ms   ({:.2}x faster, -{:.0}%)",
-        r,
-        a,
-        r / a,
-        100.0 * (r - a) / r
-    );
-}
-
-fn bench_solve(n: u32, k: u32) {
+fn bench_solve(n: u32, k: u32, out: &mut Vec<Record>) {
     let p = Params::new(n, k).unwrap();
     // find a solving nonce first (cheap for these params)
     let mut nonce = 0u32;
@@ -99,6 +77,10 @@ fn bench_solve(n: u32, k: u32) {
                 print!(" {s}");
             }
             println!();
+            // Phase records from the single instrumented run (reps=1 by
+            // nature; the split ratio is the datum, not the wall time).
+            out.push(Record::from_samples("solve_phase/gen", n, k, 1, &[gen]));
+            out.push(Record::from_samples("solve_phase/merge", n, k, 1, &[merge]));
             return;
         }
         nonce += 1;
@@ -109,7 +91,7 @@ fn bench_solve(n: u32, k: u32) {
     }
 }
 
-fn bench_verify(n: u32, k: u32) {
+fn bench_verify(n: u32, k: u32, out: &mut Vec<Record>) {
     let p = Params::new(n, k).unwrap();
     // mine one solution to verify repeatedly
     let mut nonce = 0u32;
@@ -125,71 +107,82 @@ fn bench_verify(n: u32, k: u32) {
             return;
         }
     };
-    let iters = 2000u32;
-    let t = Instant::now();
-    for _ in 0..iters {
-        let ok = eng.is_valid_solution(&sol).is_ok();
-        std::hint::black_box(ok);
-    }
-    let ns = t.elapsed().as_nanos();
-    let per = ns as f64 / iters as f64;
+    let iters = 2000u64;
+    let samples = sample(9, || {
+        for _ in 0..iters {
+            std::hint::black_box(eng.is_valid_solution(&sol).is_ok());
+        }
+    });
+    let rec = Record::from_samples("verify", n, k, iters, &samples);
     println!(
         "  verify ({n},{k}): {:.1} us/verify  |  {:.0} verifies/s  ({} leaves/verify)",
-        per / 1e3,
-        1e9 / per,
+        rec.per_unit_ns() / 1e3,
+        1e9 / rec.per_unit_ns(),
         1usize << k
     );
+    out.push(rec);
 }
 
-fn bench_all_solvers(n: u32, k: u32) {
+/// Finds a nonce whose attempt has at least one solution.
+fn solving_engine(p: Params) -> Option<Requihash> {
+    let mut nonce = 0u32;
+    loop {
+        let eng = Requihash::new(p, b"bench-input", &nonce.to_le_bytes());
+        if !eng.solve_arena().is_empty() {
+            return Some(eng);
+        }
+        nonce += 1;
+        if nonce > 4000 {
+            return None;
+        }
+    }
+}
+
+fn bench_all_solvers(n: u32, k: u32, out: &mut Vec<Record>) {
     use requihash::solve::all_solvers;
     let p = Params::new(n, k).unwrap();
-    // solving nonce
-    let mut nonce = 0u32;
-    while Requihash::new(p, b"bench-input", &nonce.to_le_bytes()).solve().is_empty() {
-        nonce += 1;
-        if nonce > 4000 { println!("  ({n},{k}): none"); return; }
-    }
-    let eng = Requihash::new(p, b"bench-input", &nonce.to_le_bytes());
-    let reps = if n >= 96 { 3 } else { 9 };
+    let Some(eng) = solving_engine(p) else {
+        println!("  ({n},{k}): none");
+        return;
+    };
+    let reps = if n >= 96 { 5 } else { 11 };
     print!("  ({n},{k}):");
     for s in all_solvers() {
-        let mut samp = Vec::new();
-        for _ in 0..reps {
-            let t = Instant::now();
+        let samples = sample(reps, || {
             std::hint::black_box(s.solve(&eng));
-            samp.push(t.elapsed().as_nanos());
-        }
-        print!("  {}={:.1}ms", s.name(), median_ns(samp) as f64 / 1e6);
+        });
+        let rec = Record::from_samples(&format!("solve/{}", s.name()), n, k, 1, &samples);
+        print!("  {}={:.1}ms", s.name(), rec.median_ns as f64 / 1e6);
+        out.push(rec);
     }
     println!();
 }
 
-fn bench_all_verifiers(n: u32, k: u32) {
+fn bench_all_verifiers(n: u32, k: u32, out: &mut Vec<Record>) {
     use requihash::verify::all_verifiers;
     let p = Params::new(n, k).unwrap();
-    let mut nonce = 0u32;
-    let (eng, sol) = loop {
-        let e = Requihash::new(p, b"bench-input", &nonce.to_le_bytes());
-        if let Some(s) = e.solve_arena().into_iter().next() { break (e, s); }
-        nonce += 1;
-        if nonce > 4000 { println!("  ({n},{k}): none"); return; }
+    let Some(eng) = solving_engine(p) else {
+        println!("  ({n},{k}): none");
+        return;
     };
-    let iters = 3000u32;
+    let sol = eng.solve_arena().into_iter().next().expect("has solution");
+    let iters = 3000u64;
     print!("  ({n},{k}):");
     for v in all_verifiers() {
-        let t = Instant::now();
-        for _ in 0..iters {
-            std::hint::black_box(v.verify(&eng, &sol).is_ok());
-        }
-        let per = t.elapsed().as_nanos() as f64 / iters as f64;
-        print!("  {}={:.1}us", v.name(), per / 1e3);
+        let samples = sample(9, || {
+            for _ in 0..iters {
+                std::hint::black_box(v.verify(&eng, &sol).is_ok());
+            }
+        });
+        let rec = Record::from_samples(&format!("verify/{}", v.name()), n, k, iters, &samples);
+        print!("  {}={:.1}us", v.name(), rec.per_unit_ns() / 1e3);
+        out.push(rec);
     }
     println!();
 }
 
 #[cfg(feature = "simd")]
-fn bench_hash_backends(n: u32, k: u32) {
+fn bench_hash_backends(n: u32, k: u32, out: &mut Vec<Record>) {
     use requihash::hash::{scalar::Blake2bScalar, simd::Blake2bSimd, LeafHasher};
     let p = Params::new(n, k).unwrap();
     let leaves = 1usize << (p.collision_bit_length() + 1);
@@ -199,76 +192,122 @@ fn bench_hash_backends(n: u32, k: u32) {
     let scalar = Blake2bScalar::new();
     let simd = Blake2bSimd::new();
     print!("  ({n},{k}):");
-    for (name, h) in [("scalar", &scalar as &dyn LeafHasher), ("simd", &simd as &dyn LeafHasher)] {
-        let mut out = vec![0u8; leaves * h.output_len()];
-        let mut samp = Vec::new();
-        for _ in 0..5 {
-            let t = Instant::now();
-            h.hash_many(&person, prefix, &keys, &mut out);
-            std::hint::black_box(&out);
-            samp.push(t.elapsed().as_nanos());
-        }
-        let ns = median_ns(samp) as f64;
-        print!("  {}={:.2}M/s", name, leaves as f64 / (ns / 1e9) / 1e6);
+    for (name, h) in [
+        ("scalar", &scalar as &dyn LeafHasher),
+        ("simd", &simd as &dyn LeafHasher),
+    ] {
+        let mut outbuf = vec![0u8; leaves * h.output_len()];
+        let samples = sample(5, || {
+            h.hash_many(&person, prefix, &keys, &mut outbuf);
+            std::hint::black_box(&outbuf);
+        });
+        let rec = Record::from_samples(&format!("hash/{name}"), n, k, leaves as u64, &samples);
+        print!("  {}={:.2}M/s", name, 1e3 / rec.per_unit_ns());
+        out.push(rec);
     }
     println!();
 }
 
+fn report_against_baseline(records: &[Record], baseline: &[BaselineEntry], band_pct: u32) {
+    println!("\n== baseline comparison (band: max(MADs, {band_pct}% of baseline min)) ==");
+    let (mut wins, mut regs, mut noise, mut new) = (0, 0, 0, 0);
+    for rec in records {
+        match compare(rec, baseline, band_pct) {
+            Verdict::Win(pct) => {
+                wins += 1;
+                println!("  WIN        {}  -{pct:.1}%", rec.key());
+            }
+            Verdict::Regression(pct) => {
+                regs += 1;
+                println!("  REGRESSION {}  +{pct:.1}%", rec.key());
+            }
+            Verdict::Noise => noise += 1,
+            Verdict::New => {
+                new += 1;
+                println!("  new        {}", rec.key());
+            }
+            Verdict::Untracked => {}
+        }
+    }
+    println!("  wins {wins} / regressions {regs} / within noise {noise} / new {new}");
+}
+
 fn main() {
+    let mut json_path: Option<String> = None;
+    let mut baseline_path: Option<String> = None;
+    let mut band_pct: u32 = 5;
+    let mut tag = std::env::var("REQ_BENCH_TAG").unwrap_or_else(|_| "untagged".into());
+    let mut args = std::env::args().skip(1);
+    while let Some(a) = args.next() {
+        match a.as_str() {
+            "--json" => json_path = args.next(),
+            "--baseline" => baseline_path = args.next(),
+            "--band-pct" => band_pct = args.next().and_then(|v| v.parse().ok()).unwrap_or(band_pct),
+            "--tag" => tag = args.next().unwrap_or(tag),
+            other => {
+                eprintln!("unknown argument {other:?}");
+                std::process::exit(2);
+            }
+        }
+    }
+
+    let mut records: Vec<Record> = Vec::new();
+
     println!("== Requihash benchmark (multi-backend) ==");
     // ell = n/(k+1); init list = 2^(ell+1). Kept <= (96,5): ell=16, 2^17 leaves.
     // (144,5) has ell=24 -> 2^25 leaves (~gigabytes), out of scope for a quick bench.
     let params = [(48u32, 5u32), (72, 5), (96, 5)];
 
-    println!("\n[1] leaf hashing throughput (13-24% of solve; see [2]):");
+    println!("\n[1] leaf hashing throughput:");
     for &(n, k) in &params {
-        bench_leaf_hash(n, k);
+        bench_leaf_hash(n, k, &mut records);
     }
 
     println!("\n[2] full solve, gen vs merge split:");
     for &(n, k) in &params {
-        bench_solve(n, k);
+        bench_solve(n, k, &mut records);
     }
 
     println!("\n[3] verifier throughput (consensus-critical latency):");
     for &(n, k) in &params {
-        bench_verify(n, k);
+        bench_verify(n, k, &mut records);
     }
 
-    println!("\n[5] OPTIMIZATION: reference solve vs arena solve (kills per-row alloc):");
+    println!("\n[4] ALL SOLVER BACKENDS (seam B), median ms:");
     for &(n, k) in &params {
-        bench_solve_compare(n, k);
+        bench_all_solvers(n, k, &mut records);
     }
 
-    println!("\n[6] ALL SOLVER BACKENDS (seam B), median ms:");
+    println!("\n[5] ALL VERIFIER BACKENDS (verify seam), us/verify:");
     for &(n, k) in &params {
-        bench_all_solvers(n, k);
-    }
-
-    println!("\n[7] ALL VERIFIER BACKENDS (verify seam), us/verify:");
-    for &(n, k) in &params {
-        bench_all_verifiers(n, k);
+        bench_all_verifiers(n, k, &mut records);
     }
 
     #[cfg(feature = "simd")]
     {
-        println!("\n[8] HASH BACKENDS (seam A) batched hash_many, M leaves/s:");
+        println!("\n[6] HASH BACKENDS (seam A) batched hash_many, M leaves/s:");
         for &(n, k) in &params {
-            bench_hash_backends(n, k);
+            bench_hash_backends(n, k, &mut records);
         }
     }
 
-    println!("\n[4] where solve time scales (list grows 16x per param step):");
-    println!("    (48,5)->(72,5): time 21.1x ; (72,5)->(96,5): time 19.0x");
-    println!("    superlinear -> merge (sort O(m log m) + pairwise buckets) dominates,");
-    println!("    not leaf hashing. gen% falls (24%->13%) as n grows.");
+    if let Some(path) = &baseline_path {
+        match std::fs::read_to_string(path) {
+            Ok(text) => report_against_baseline(&records, &load_baseline(&text), band_pct),
+            Err(e) => eprintln!("baseline {path}: {e}"),
+        }
+    }
 
-    println!("\nNotes:");
-    println!("  - At these params MERGE dominates (76-87%), not hashing. The");
-    println!("    gen fraction shrinks as the list grows, so batched-SIMD hashing");
-    println!("    helps less than expected here; the bigger miner win is a better");
-    println!("    merge (index-trimmed k-list, paper Prop 3) that shrinks per-round");
-    println!("    memory and avoids the allocation-per-merged-row this reference does.");
-    println!("  - The verifier is flat ~7 us regardless of n (only 2^k=32 leaves,");
-    println!("    k rounds of fixed work). This is the consensus path and it is cheap.");
+    if let Some(path) = &json_path {
+        use std::io::Write as _;
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .expect("open json output");
+        for rec in &records {
+            writeln!(f, "{}", rec.to_json_line(&tag)).expect("write record");
+        }
+        println!("\n{} records appended to {path}", records.len());
+    }
 }
