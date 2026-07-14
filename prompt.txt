@@ -1,0 +1,11 @@
+Describe benchmarking and tuning memory partitioning and utilization applying separately and interleaving fetch and search
+
+organize atomic swap research and code into a dedicated ATOMIC.md document, detailed enough for on-chain experimentation and toward productization
+
+scan work in /Users/walter/Work/Spank/spank-rs/research/compute-crypto-frontiers, particularly documents for memory-hard PoW and for post-quantum, utilize suggestions, research, directions
+
+
+proceed with 2. and 3.
+decompose and beef-up 4.
+postpone 5.
+what else pending or ready for development?
