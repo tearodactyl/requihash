@@ -5,6 +5,14 @@ proposed by Tang, Sun, and Gong, "On the Regularity of the Generalized Birthday
 Problem" ([eprint 2025/1351](https://eprint.iacr.org/2025/1351)), Section 5.2.
 Findings context: [../Equihash.md](../Equihash.md), F-A4.
 
+Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
+(what's implemented vs. specified-only); [PLAN.md](PLAN.md) — Groups A–C
+status and requirements, the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
+— throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
+solution size and memory across parameters, naive vs. index-pointer; [TMTO.md](TMTO.md)
+— the time-memory tradeoff research plan; [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)
+— structural attack-surface review.
+
 This directory delivers two independent implementations that share a byte-exact
 wire format so a solution mined by one verifies in the other:
 

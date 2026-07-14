@@ -30,7 +30,9 @@ debug = true    # keep symbols so `sample` can attribute merge-internal time
 default = []
 rayon = ["dep:rayon"]
 simd = ["dep:blake2b_simd"]
+blake3 = ["dep:blake3"]
 
 [dependencies]
 rayon = { version = "1", optional = true }
 blake2b_simd = { version = "1", optional = true }
+blake3 = { version = "1", optional = true }

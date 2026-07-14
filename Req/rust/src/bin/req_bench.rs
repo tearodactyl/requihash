@@ -8,6 +8,8 @@
 //!   --json <path>       append machine-readable records (JSON lines)
 //!   --baseline <path>   compare this run against a saved JSONL baseline
 //!   --band-pct <n>      relative noise floor for comparisons (percent)
+//!   --family            include the SPEC family campaign (gen/substitution/
+//!                       verify-cost across hash x m x params; heavy)
 //!   --tag <name>        machine tag recorded in emitted lines
 //!
 //! Uses only std::time; no external bench framework so it builds
@@ -15,6 +17,7 @@
 //! `requihash::report` (min + median + MAD; a delta counts only beyond the
 //! MAD band — see BENCHMARK.md §5).
 
+use requihash::probe::{GenProbe, HashKind, Keying};
 use requihash::report::{compare, load_baseline, BaselineEntry, Record, Verdict};
 use requihash::*;
 use std::time::Instant;
@@ -208,6 +211,125 @@ fn bench_hash_backends(n: u32, k: u32, out: &mut Vec<Record>) {
     println!();
 }
 
+fn family_hashes() -> Vec<HashKind> {
+    #[allow(unused_mut)]
+    let mut v = vec![HashKind::Blake2b];
+    #[cfg(feature = "simd")]
+    v.push(HashKind::Blake2bSimd);
+    #[cfg(feature = "blake3")]
+    v.push(HashKind::Blake3);
+    v
+}
+
+/// SPEC-conformant family campaign: generator throughput per (hash, m) at
+/// production-relevant parameters, substitution-variant phase attribution,
+/// and verify-shaped cost. Heavy; enabled with --family.
+fn bench_family(out: &mut Vec<Record>) {
+    println!("\n[F1] GENERATOR gen-phase, ns/leaf-unit (leaf-units = leaves x m):");
+    // (96,5) sweeps m; the large parameter points run m=1 (runtime budget).
+    let matrix: [(u32, u32, &[u32]); 3] =
+        [(96, 5, &[1, 4, 16]), (144, 5, &[1]), (200, 9, &[1])];
+    for &(n, k, ms) in &matrix {
+        let p = Params::new(n, k).unwrap();
+        for kind in family_hashes() {
+            for &m in ms {
+                let probe = GenProbe::new(p, kind, m, Keying::Regular, b"family-bench", &0u32.to_le_bytes());
+                let mut sink = vec![0u8; probe.leaf_count() * probe.row_stride()];
+                let reps = if probe.leaf_count() >= 1 << 24 { 3 } else { 5 };
+                let samples = sample(reps, || {
+                    probe.gen_phase(&mut sink);
+                    std::hint::black_box(&sink);
+                });
+                let units = probe.leaf_count() as u64 * m as u64;
+                let rec = Record::from_samples(&format!("gen/{}/m{}", kind.name(), m), n, k, units, &samples);
+                println!(
+                    "  ({n},{k}) {} m={m}: {:.2} ms/phase | {:.1} ns/leaf-unit | {:.2} M leaf-units/s",
+                    kind.name(),
+                    rec.min_ns as f64 / 1e6,
+                    rec.per_unit_ns(),
+                    1e3 / rec.per_unit_ns()
+                );
+                out.push(rec);
+            }
+        }
+    }
+
+    println!("\n[F2] SUBSTITUTION attribution at (96,5), m=1 (marginals; residual = interaction):");
+    let p = Params::new(96, 5).unwrap();
+    for kind in family_hashes() {
+        let probe = GenProbe::new(p, kind, 1, Keying::Regular, b"family-bench", &0u32.to_le_bytes());
+        let mut sink = vec![0u8; probe.leaf_count() * probe.row_stride()];
+        let mut mins = Vec::new();
+        for (variant, f) in [
+            ("real", 0u8),
+            ("stub_hash", 1),
+            ("stub_assembly", 2),
+        ] {
+            let samples = sample(5, || {
+                match f {
+                    0 => probe.gen_phase(&mut sink),
+                    1 => probe.gen_phase_stub_hash(&mut sink),
+                    _ => probe.gen_phase_stub_assembly(&mut sink),
+                }
+                std::hint::black_box(&sink);
+            });
+            let rec = Record::from_samples(
+                &format!("gensub/{}/{variant}", kind.name()),
+                96,
+                5,
+                probe.leaf_count() as u64,
+                &samples,
+            );
+            mins.push(rec.min_ns);
+            out.push(rec);
+        }
+        let (real, sh, sa) = (mins[0] as i128, mins[1] as i128, mins[2] as i128);
+        let hash_marginal = real - sh;
+        let asm_marginal = real - sa;
+        let residual = real - hash_marginal - asm_marginal;
+        println!(
+            "  {}: real {:.2} ms | hash marginal {:.2} ms ({:.0}%) | assembly marginal {:.2} ms ({:.0}%) | residual {:.2} ms ({:.0}%)",
+            kind.name(),
+            real as f64 / 1e6,
+            hash_marginal as f64 / 1e6,
+            100.0 * hash_marginal as f64 / real as f64,
+            asm_marginal as f64 / 1e6,
+            100.0 * asm_marginal as f64 / real as f64,
+            residual as f64 / 1e6,
+            100.0 * residual as f64 / real as f64,
+        );
+    }
+
+    println!("\n[F3] VERIFY-shaped cost (2^k x m leaf recomputes + fold), us/verify:");
+    for &(n, k) in &[(96u32, 5u32), (144, 5), (200, 9)] {
+        let p = Params::new(n, k).unwrap();
+        for kind in family_hashes() {
+            for m in [1u32, 16] {
+                let probe = GenProbe::new(p, kind, m, Keying::Regular, b"family-bench", &0u32.to_le_bytes());
+                let iters = 100u64;
+                let samples = sample(9, || {
+                    for _ in 0..iters {
+                        std::hint::black_box(probe.verify_cost());
+                    }
+                });
+                let rec = Record::from_samples(
+                    &format!("verifycost/{}/m{m}", kind.name()),
+                    n,
+                    k,
+                    iters,
+                    &samples,
+                );
+                println!(
+                    "  ({n},{k}) {} m={m}: {:.1} us/verify",
+                    kind.name(),
+                    rec.per_unit_ns() / 1e3
+                );
+                out.push(rec);
+            }
+        }
+    }
+}
+
 fn report_against_baseline(records: &[Record], baseline: &[BaselineEntry], band_pct: u32) {
     println!("\n== baseline comparison (band: max(MADs, {band_pct}% of baseline min)) ==");
     let (mut wins, mut regs, mut noise, mut new) = (0, 0, 0, 0);
@@ -235,6 +357,7 @@ fn report_against_baseline(records: &[Record], baseline: &[BaselineEntry], band_
 fn main() {
     let mut json_path: Option<String> = None;
     let mut baseline_path: Option<String> = None;
+    let mut family = false;
     let mut band_pct: u32 = 5;
     let mut tag = std::env::var("REQ_BENCH_TAG").unwrap_or_else(|_| "untagged".into());
     let mut args = std::env::args().skip(1);
@@ -243,6 +366,7 @@ fn main() {
             "--json" => json_path = args.next(),
             "--baseline" => baseline_path = args.next(),
             "--band-pct" => band_pct = args.next().and_then(|v| v.parse().ok()).unwrap_or(band_pct),
+            "--family" => family = true,
             "--tag" => tag = args.next().unwrap_or(tag),
             other => {
                 eprintln!("unknown argument {other:?}");
@@ -289,6 +413,10 @@ fn main() {
         for &(n, k) in &params {
             bench_hash_backends(n, k, &mut records);
         }
+    }
+
+    if family {
+        bench_family(&mut records);
     }
 
     if let Some(path) = &baseline_path {

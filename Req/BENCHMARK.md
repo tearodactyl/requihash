@@ -16,7 +16,7 @@ Measured on Apple Silicon (aarch64), scalar reference backend, `--release`
 Evidence grade: Measured (harness committed as `rust/src/bin/req_bench.rs`,
 `req_profile.rs`; statistics and comparison rules in `rust/src/report.rs`).
 
-**Regression workflow** (the §5 gap-3 discipline, implemented): every bench
+**Regression workflow** (the §8 gap-3 discipline, implemented): every bench
 emits a JSON-lines record (min/median/MAD over warm reps; warm-up by time
 budget so microbenches get scheduled and ramped before sampling). A baseline
 file holds several appended runs; comparison is against the per-key *median of
@@ -29,7 +29,14 @@ interleaved in one run) resolve ~1%; cross-process baseline tracking resolves
 the band; any verdict at the band edge counts only if it reproduces on a second
 run. Single-rep records (the instrumented solve's phase splits) are never
 tracked — their ratios are the datum. Committed baselines live in
-`baselines/`, tagged per machine.
+`baselines/`, tagged per machine. **Collection hygiene, learned the hard
+way:** baselines recorded on a loaded machine are biased slow and later
+manifest as phantom across-the-board wins — collect them idle (no concurrent
+builds), let the machine cool between back-to-back heavy runs (a family run
+launched immediately after another produced a ~19% thermal outlier on the
+blake2b family while blake3 held stable), and treat a comparison where
+*unrelated* benches all move the same direction as a machine-state signal,
+not a result.
 
 ## 1. Headline numbers
 
@@ -230,7 +237,7 @@ the default verifier; the reference solver/verifier stay as the equivalence orac
   lowers gen% further, making the merge share (and thus radix/parallel-merge
   priority) even more dominant.
 
-## 5. Harness fitness for per-component iterative optimization (reviewed)
+## 8. Harness fitness for per-component iterative optimization (reviewed)
 
 The requirement: benchmark and iteratively optimize each algorithmic component — the generator hash (BLAKE2b today, BLAKE3 candidate) — separately and in composition. Verdict on this harness, and the upgrade order.
 
@@ -247,3 +254,78 @@ The requirement: benchmark and iteratively optimize each algorithmic component �
 **Segregation from node development.** This lab is materially independent of Zebro/Zebra (no dependencies on either; std-only), and the work continues here — `Requihash/Req`, already under version control, with `SPEC.md` (the family specification) and `baselines/` (committed bench results) as the only structural additions. A dedicated repository is deferred until a trigger fires: a publication boundary between this implementation and the essay corpus, lab CI, a second consumer beyond Zebro, or history-navigation cost; `git subtree split -P Req` preserves full history whenever that day comes. The artifact that makes the segregation crisp is the **family specification** owned by this program: the parameterized object `PoW(n, k, hash, m, keying ∈ {single-list, regular}, context)` with byte-exact generator, solution encoding, and verification algorithm. Every element — Requihash's keying included — is a proposal and a design freedom; the lab searches that space with measurements, and the chain side pins one instance as era data behind its engine seam when the search converges. Node development and PoW research couple only through the spec and a vector-file format.
 
 **Composition across levels.** This harness owns solver-side composition; the consensus-stack verify yardstick (Zebro's criterion bench over the pinned `equihash` crate) and the in-node C++ measurement (ZeroPerf) are the other two levels. They are deliberately not seamed — they measure shipped stacks. The bridge: this harness (variant set to plain Equihash) can *mine* cross-parameter solution vectors for the consensus-side verify curve. BLAKE3 composition can only be measured here until an owned PoW crate exists — no shipped stack carries it.
+
+## 9. Family campaign — first results (blake2b vs blake3 × m)
+
+Apple Silicon, `--release --features blake3`, regular keying, per SPEC.md
+constructions; records in `baselines/apple-silicon-dev.jsonl` (`gen/*`,
+`gensub/*`, `verify_cost/*`). Evidence grade: Measured.
+
+**Generation phase (ns per leaf-unit; leaf-units = leaves × m; blake2b_simd
+column from the implementation-matched rerun, median of two agreeing runs with
+one thermal outlier discarded per the confirmation rule):**
+
+| Config | blake2b (bundled scalar) | blake2b_simd (batched hash_many) | blake3 | blake3 vs best blake2b |
+|---|---|---|---|---|
+| (96,5) m=1 | 139–145 | 124.9 | 77.0 | 1.62× |
+| (96,5) m=4 | 121–125 | 116.0 | 96.5 | 1.20× |
+| (96,5) m=16 | 116–119 | 108.6 | 86.0 | 1.26× |
+| (144,5) m=1 | 145–155 | 137.7 | 93.8 | 1.47× |
+| (200,9) m=1 | 155–164 | 146.3 | 110.0 | 1.33× |
+
+Three readings, one caveat. (1) blake3's m=1 advantage comes substantially
+from its *streamed* generation (one XOF stream per class — no per-leaf hasher
+setup); (2) iteration narrows it: m ≥ 2 falls back to per-leaf work and the
+advantage drops to ~1.3× — an earlier collapse to ~1.1× was self-inflicted
+(the derive_key context key was re-derived per leaf per round; deriving the
+template once and cloning it per round recovered ~18–22% at m ≥ 2) — while
+blake2b's per-unit cost *drops* with m (iteration rounds absorb one short
+block, no input/nonce prefix); (3) the full (144,5) initial list generates in
+seconds, not minutes — production-parameter generation benching is routine.
+**The implementation-matched verdict (ARM).** The `blake2b_simd` rerun
+(batched `hash_many` generation, byte-equivalence-gated against the scalar
+construction) retires the maturity caveat *on this architecture* — and mostly
+confirms the gap: `blake2b_simd` gains only ~10% over the bundled scalar,
+because the crate's vector paths are x86-only and ARM gets its portable
+implementation. Against the best available blake2b, blake3 keeps 1.33–1.62×
+at m=1 and ~1.2–1.3× under iteration (the pre-stated R ≤ 0.8 gate is met
+everywhere except (96,5) m=4 at R = 0.83, marginal). The durable ARM finding,
+consistent with the ZeroPerf libsodium story: the BLAKE2b ecosystem has no ARM
+SIMD investment anywhere, while blake3 ships NEON — on ARM the blake3
+advantage is real, not artifact. Still pending for the other architecture: an
+x86-64/AVX2 leg, where `blake2b_simd`'s 4-way path should narrow the gap.
+
+**Substitution attribution at (96,5), m=1:**
+
+| | real | hash marginal | assembly marginal | residual |
+|---|---|---|---|---|
+| blake2b | 17.79 ms | 79% | 21% | 0% |
+| blake2b_simd | 20.21 ms | 78% | 20% | 2% |
+| blake3 | 9.46 ms | 63% | 32% | 5% |
+
+Both attributions are clean (marginals sum to ~100%, residual at or near
+noise). The first campaign's blake3 attribution was invalid — leaf-major stub
+variants against the class-major streamed real path violated code-shape
+identity, producing a negative assembly marginal and a 64% residual; the
+framework's own precondition caught it. Fixed by dispatching all three
+variants through one loop-shape implementation per backend
+(`gen_phase_variant`), so a stub can never walk a different loop than the
+path it stubs. The corrected picture: blake3 spends proportionally less on
+hashing (63% vs 79%) and more on assembly — expand/pack is the next shared
+optimization target, worth ~a fifth of either generator.
+
+**Verify-shaped cost (2^k × m leaf recomputes + fold):**
+
+| Config | blake2b | blake3 |
+|---|---|---|
+| (144,5) m=1 | 5.1 µs | 4.0 µs |
+| (144,5) m=16 | 58.9 µs | 57.4 µs |
+| (200,9) m=1 | 86.5 µs | 84.9 µs |
+| (200,9) m=16 | 959 µs | 922 µs |
+
+Verification is hash-setup-bound, not stream-bound, so the two hashes are
+near-equal there. The (200,9) m=1 cost lands in the same ballpark as the
+consensus-stack yardstick (zebro-bench's `equihash_verify`), a useful sanity
+anchor. The m dial behaves as designed: cost scales mildly sublinearly in m
+(iteration rounds are single-block), and (144,5) at m=16 — exactly the
+`2^k·m = 512` budget bound — still verifies cheaper than (200,9) at m=1.

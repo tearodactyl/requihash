@@ -11,6 +11,7 @@
 mod blake2b;
 
 pub mod hash;
+pub mod probe;
 pub mod report;
 pub mod solve;
 pub mod verify;
@@ -521,9 +522,17 @@ fn slices_distinct(a: &[u32], b: &[u32]) -> bool {
 // ---- bit-packing (matches C++ ExpandArray/CompressArray) ----
 
 pub fn expand_array(input: &[u8], out_len: usize, bit_len: usize, byte_pad: usize) -> Vec<u8> {
+    let mut out = vec![0u8; out_len];
+    expand_array_into(input, &mut out, bit_len, byte_pad);
+    out
+}
+
+/// In-place [`expand_array`]: writes into a caller-provided buffer, so hot
+/// paths (one expansion per leaf) pay no per-leaf allocation. `out` must be
+/// exactly the intended output length and is fully overwritten.
+pub fn expand_array_into(input: &[u8], out: &mut [u8], bit_len: usize, byte_pad: usize) {
     let out_width = (bit_len + 7) / 8 + byte_pad;
     let bit_len_mask: u32 = (1u32 << bit_len) - 1;
-    let mut out = vec![0u8; out_len];
     let mut acc_bits = 0usize;
     let mut acc_value: u32 = 0;
     let mut j = 0usize;
@@ -543,7 +552,6 @@ pub fn expand_array(input: &[u8], out_len: usize, bit_len: usize, byte_pad: usiz
             j += out_width;
         }
     }
-    out
 }
 
 pub fn compress_array(input: &[u8], out_len: usize, bit_len: usize, byte_pad: usize) -> Vec<u8> {
