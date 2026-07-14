@@ -49,7 +49,7 @@ breaking its claim that low-memory provers suffer large penalties. MTP is not
 Equihash, but the lesson generalizes and is the load-bearing one for any
 implementation: **a memory-hard PoW's steepness claim can be false against an
 unforeseen tradeoff, and is only as strong as the best known attack** — until the
-TCC 2025 pebbling lower bounds (Equihash.md F-A6), no steepness claim in this
+the Blocki-Smearsoll pebbling lower bounds (Equihash.md F-A6, eprint 2025/1456), no steepness claim in this
 family was a theorem.
 
 ## 2. What this implies for Req
@@ -111,8 +111,8 @@ Concrete, ordered by value:
 3. **Adversarial pass.** Attempt a sub-linear tradeoff against the Requihash
    solver (the Dinur-Nadler posture); a failure to find one is weak evidence for
    the claim, a success is a finding that would matter to every Requihash adopter.
-4. **Pebbling cross-check.** Relate the measured curve to the TCC 2025 pebbling
-   lower bound (F-A6) — the theorem the empirical steepness should not be able to
+4. **Pebbling cross-check.** Relate the measured curve to the pebbling
+   lower bound (F-A6, eprint 2025/1456) — the theorem the empirical steepness should not be able to
    beat.
 
 ### 3a. Method refinement: counting first, wall-clock second (2026-07-12)
@@ -162,7 +162,7 @@ fields; `~/Work/ZK/Zebro/CONSENSUS.md` §2.2):
 | Equihash Prop 4/6 (steepness (k-1)/2 vs k/2) | Algorithm binding raises TMTO steepness | The M/q regime is a measurable solver backend; k/2 is the target curve |
 | Alcock-Ren refutation | No tradeoff bound proven for Equihash's *loose* problem | Requihash's regular problem is the one the k/2 claim legitimately applies to |
 | Dinur-Nadler MTP attack | Steepness claims fall to unforeseen tradeoffs | Ship a TMTO test harness that attacks our own memory floor |
-| TCC 2025 pebbling (context) | First provable memory lower bounds | The ceiling the measured steepness must respect |
+| Pebbling lower bound (eprint 2025/1456, context) | First provable memory lower bounds | The ceiling the measured steepness must respect |
 
 The through-line: **Equihash's TMTO security was a claim about the wrong problem,
 Requihash makes it a claim about the right one, and this implementation is the

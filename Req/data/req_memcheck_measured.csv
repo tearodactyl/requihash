@@ -1,0 +1,9 @@
+n,k,backend,formula_naive_bytes,measured_peak_bytes,ratio,source
+24,5,reference,224,11655,52.0312,measured
+48,5,reference,5120,178887,34.9389,measured
+72,5,reference,106496,2097842,19.6988,measured
+96,5,reference,2097152,58087956,27.6985,measured
+24,5,arena,224,8772,39.1607,measured
+48,5,arena,5120,168780,32.9648,measured
+72,5,arena,106496,2175204,20.4252,measured
+96,5,arena,2097152,69214816,33.0042,measured

@@ -29,11 +29,13 @@ Status legend: **Done** (merged/measured, artifact cited) · **In progress**
 | A8 | Solution/memory sizing table, naive vs. index-pointer, Equihash vs. Requihash, k∈{5,7,9} | **Done** | `SIZING.md` |
 | A9 | Redirected focus: implementation quality, concurrency, data-sizing fitness (replaces further hash-vs-hash comparison as the primary lab activity) | **In progress** — this document's own next section | Below |
 | A10 (new) | Naming note (not a correction — project keeps "Requihash" by explicit decision): the source paper's own artifact repo calls the construction **Sequihash** — verified directly against `tl2cents/Generalized-Birthday-Problem`. Also verified: searching "Sequihash" or the eprint number turns up nothing beyond the paper and that one repo — no independent implementations or citations found | **Done, no rename** | `SIZING.md` §0 and `Equihash.md` both mention the paper's naming inline, once, when citing the paper directly; "Requihash" remains this project's name everywhere else |
-| A11 (new) | Memory-formula correction: `Equihash.md`'s and the prior `SIZING.md`'s "~49 MB at (200,9)" figure for Equihash index-pointer memory does not match the paper's own estimator (`single_list_ip_mem_estimator` gives 94 MB) — the figure was carried across documents without ever being checked against the source | **Done** — fixed in both `SIZING.md` (exact formula, no calibration) and `~/Work/ZK/ZKs/Equihash.md` (94 → 224 MB, with the reconciliation caveat inline) |
-| A12 (new) | Reconciliation gap: neither the naive nor the exact index-pointer formula in `SIZING.md` matches tromp's real measured ~144 MB at (200,9) — three inconsistent numbers on the same nominal parameters | **Not started** — see `SIZING.md` §4 for the specifics; likely requires actually reading/running `equi_miner.c`'s bucket-sizing arithmetic rather than trusting either closed-form estimator. Numeric curiosity noted there (144 ÷ 9/14 ≈ 224 MB matching the Sequihash figure) but explicitly flagged as unconfirmed, likely-coincidental — not a finding |
-| A13 (new) | BLAKE2b NEON: the official `BLAKE2/BLAKE2` reference repo ships a maintained `neon/` directory (2018, correctness-patched 2023) — real, usable, aarch64-targeted C code, unlike `blake2b_simd` (Rust crate, x86-only). ZeroPerf's `Perf.md` §9.2 already scoped vendoring it for the C++/libsodium path in detail (vendor-don't-link, standalone KAT harness, feature-flag gate, differential test). Real-world caveat found via web search, not yet verified locally: at least one report of BLAKE2b NEON running *slower* than scalar on ARMv8/Cortex-A57 — do not assume NEON is a win here without measuring | **Not started here** — the ZeroPerf plan is a template this repo could reuse: add a fourth `HashKind`/`LeafHasher` backend wrapping vendored `blake2b-neon.c` via a small FFI shim, gated behind a new feature, equivalence-gated exactly like `Blake2bSimd` was, **then actually measured on this machine** before any claim about it helping or hurting |
+| A11 (new, corrected twice) | Memory-figure whiplash on Equihash(200,9): **49 MB (original, correct) → wrongly "corrected" to 94 MB on 2026-07-13 (reasoning from the paper's companion notebook, `single_list_ip_mem_estimator`, which does not match the paper's own published Table 3) → restored to 49 MB on 2026-07-14 after reading the actual PDF's Table 3 directly (page 31: 2^28.6 bits ≈ 49 MB, matching Proposition 4's plain O(n·N) bound at constant 1, not Proposition 7's different formula which gives 94 MB)** | **Done, fixed correctly this time** — `SIZING.md` §0a documents the full two-step error trail so it can't recur silently; `~/Work/ZK/ZKs/Equihash.md` restored to 49 → 223 MB with a citation to the specific table/page. Both formulas (Proposition 4 for Equihash, Proposition 6 for Requihash/Sequihash) now validated against **all seven** of the paper's published Table 3 rows, not one point, before being used to extrapolate the rest of `SIZING.md`'s sweep |
+| A12 (new) | Reconciliation gap: tromp's real measured ~144 MB at (200,9) does not match the paper's published 49 MB for the same nominal parameters (~3× gap) | **Not started** — see `SIZING.md` §5 for the specifics; likely requires actually reading/running `equi_miner.c`'s bucket-sizing arithmetic rather than trusting the paper's asymptotic estimator. The earlier "144 ÷ 9/14 ≈ 224 MB" numeric coincidence (compared against the now-retired 94 MB figure) is retracted along with it — do not re-derive or over-read it |
+| A13 (new) | BLAKE2b NEON: the official `BLAKE2/BLAKE2` reference repo ships a maintained `neon/` directory (2018, correctness-patched 2023) — real, usable, aarch64-targeted C code, unlike `blake2b_simd` (Rust crate, x86-only, no build.rs/C-compile step, pure-Rust `#[cfg(target_arch)]` dispatch — see BENCHMARK.md §9 for why this makes "just add NEON like blake3" structurally harder for this specific crate than for blake3's). Real-world caveat found via web search, not yet verified locally: at least one report of BLAKE2b NEON running *slower* than scalar on ARMv8/Cortex-A57 — do not assume NEON is a win here without measuring | **Not started here** — the ZeroPerf plan (`Perf.md` §9.2) is a template this repo could reuse: add a fourth `HashKind`/`LeafHasher` backend, either vendoring `blake2b-neon.c` via FFI or writing a pure-Rust `neon.rs` using `core::arch::aarch64` intrinsics, equivalence-gated exactly like `Blake2bSimd` was, **then actually measured on this machine** before any claim about it helping or hurting |
 | A14 (new) | Test-vector source for a ported index-pointer solver (A6): the pinned `equihash` crate (already a Zebro dependency) vendors official Zcash Equihash(96,5)/(200,9) known-answer vectors at `src/test_vectors/valid.rs`/`invalid.rs`, sitting unused in the local Cargo cache | **Found, not yet consumed** — no vectors have been pulled into this repo's own `vectors/` directory; doing so would give A6 a correctness oracle before any line of index-pointer code is written |
-| A15 (new) | **Upstream tromp/equihash vs. the vendored crate port — verified diff and full commit provenance, not assumed identical.** See the dedicated subsection below (A15 detail) | **Done (verified this session)** — no prior Zebro or Requihash document had checked this; `Zebro/ARCHITECTURE.md`'s "the solver is `tromp::solve_200_9` only" note was accurate about scope but did not note the port's divergence from, or its age relative to, upstream. Zebro documentation updated |
+| A15 (new) | **Upstream tromp/equihash vs. the vendored crate port — verified diff and full commit provenance, not assumed identical.** Full detail now lives in `TROMP.md` (A18) | **Done (verified this session)** — no prior Zebro or Requihash document had checked this; `Zebro/ARCHITECTURE.md`'s "the solver is `tromp::solve_200_9` only" note was accurate about scope but did not note the port's divergence from, or its age relative to, upstream. Zebro documentation updated |
+| A17 (new) | Four 2025 papers read directly from PDF (not secondary summaries): full citations, authors, venue status, and cross-paper notes in `PAPERS.md` — includes a second Sequihash-authors paper (2025/2141, Tang/Ding/Sun/Gong) with its own directly-quoted implementation numbers (700 MB / 1.45 GB / 2.5 GB for Equihash(144,5)), distinct from and not yet reconciled against paper 1351's theoretical Table 3 | **Done (reading); reconciliation not started** — `PAPERS.md`, `SIZING.md` §4. Neither this project nor (as far as checked) anyone else has run 2141's own code (`tl2cents/Wagner-Algorithms`) against the Requihash construction |
+| A18 (new) | Complete verified commit-level history of `tromp/equihash` — all 143 commits, dated and attributed, plus the full zcashd/librustzcash integration chain and the frozen-snapshot gap — written up in full in `TROMP.md` | **Done** | `~/Work/ZK/Requihash/TROMP.md`. **Contains one item flagged for the project owner, not resolved by this project**: a GitHub user handle match between this project's own git identity and a 2018 contributor to tromp's repo — see TROMP.md §4 |
 | A16 (new) | **Real memory measurement, executed this session** (`rust/src/bin/req_memcheck.rs`, a counting global allocator wrapping this repo's own `solve_reference`/`solve_arena`): SIZING.md's "naive peak memory" formula underestimates actual measured peak by **20–52×** at (24,5) through (96,5) — e.g. (96,5): formula says 2.00 MB, measured peak is 55.4 MB (reference) / 66.0 MB (arena). Root cause: per-row `Vec<u8>`/`Vec<u32>` heap allocation overhead, which the formula (raw payload bytes only) never modeled. Corroborates BENCHMARK.md's independent time-profiling finding (allocation ~59% of `solve_reference` runtime) via a completely different instrument (memory, not time) | **Done** — `SIZING.md` §2a; this is the one section of that document backed by executed code rather than transcribed formulas. Not yet run past (96,5); (144,5)+ remain unmeasured |
 
 ## New direction (this session): quality, concurrency, and sizing over hash-vs-hash
@@ -65,67 +67,6 @@ bytes by stride class, peak resident — threaded through `GenProbe` and the
 solver backends; (c) the sweep driver (q ∈ memory caps, m ∈ iteration counts)
 producing a steepness-vs-q curve per (variant, hash, m). Depends on nothing
 in A1–A4b; can start immediately.
-
-### A15 detail: the tromp solver's real provenance, verified via GitHub API commit history
-
-Traced end to end, every date/author/sha pulled directly from the GitHub
-commits API (not secondhand) on the three repos involved:
-`tromp/equihash`, `zcash/zcash`, `zcash/librustzcash`.
-
-**1. Original integration into zcashd (Oct 2016), by Daira Hopwood.**
-
-| Date (UTC) | Repo | Commit | Author | What |
-|---|---|---|---|---|
-| 2016-10-20 03:03 | `tromp/equihash` | `690fc5e` | tromp | "tiny speedups" — the exact commit copied, ~3 days after tromp's repo existed |
-| 2016-10-20 04:33 | `zcash/zcash` | `ae10ed9c4` | **Daira Hopwood** | "Add Tromp's implementation of Equihash solver (as of tromp/equihash commit 690fc5e...)" — the commit message itself pins the exact upstream sha |
-| 2016-10-20 05:03 | `zcash/zcash` | `c7aaab7aa` | **Daira Hopwood** | "Integrate Tromp solver into miner code **and remove its dependency on extra BLAKE2b implementation**" — the very first BLAKE2 swap-out happened 30 minutes after import, same day, same author |
-| 2016-10-22 | `zcash/zcash` | `dccc140bf` | Jack Grigg | Comment out tromp's debug print statements (metrics-screen interference) |
-
-**2. What zcashd's copy missed by freezing 3 days into tromp's work — verified
-by diffing the pinned sha against tromp's current master (112 commits ahead,
-0 behind, as of this check):**
-
-| Date | tromp commit | What it added, that zcashd never got |
-|---|---|---|
-| 2016-10-27 | `4c463a869`, `d3454d922` | AVX2 support, separate build targets |
-| 2016-10-27 | `fc72754de` | 2nd-stage bucketsort → slot linking (algorithmic change) |
-| **2016-11-17** | `fec951a2a` | **"add cantor slots enabling 2^10 buckets"** — the Cantor-coding optimization `~/Work/ZK/ZKs/Equihash.md` §2 already credits as tromp's single most consequential contribution, landed 28 days after the code Zcash still ships was frozen |
-| 2016-11-17 | `33fed1c9d` | "change equi_miner to 2^10 buckets; obsolete dev_miner" |
-| 2017-01-29 → 2017-08-02 | several | Small-`DIGITBITS` and (96,5)-parameter support added |
-| 2018-04-16 | `39a91772a` | (192,7) parameter target added |
-| 2018-07-10 | `191d3b583` | Command-line BLAKE2b personalization for CPU miners |
-| — | — | Two full AVX2 BLAKE2 backends added as new directories: `blake2-asm/` (hand-written asm) and `blake2-avx2/` (`blake2bip.c`, intrinsics) — neither exists in the pinned snapshot |
-
-Net: the code path Zebro depends on today (`equihash` crate → `tromp` module
-→ `solve_200_9`) is running solver logic **from before tromp's own
-Cantor-coding bucket optimization existed**, not merely "an old version" in
-the abstract — a specific, datable, and consequential gap.
-
-**3. Post-import history inside zcashd/librustzcash — three more BLAKE2
-swaps, none touching the frozen solver logic itself:**
-
-| Date | Repo | Commit | Author | What |
-|---|---|---|---|---|
-| 2018-03-02 | `zcash/zcash` | `c938fb1f1` | Daira Hopwood | Large squashed commit (53 files) — general codebase churn, not solver-specific |
-| 2020-07-14 | `zcash/zcash` | `2d172e121` | Jack Grigg | Replace libsodium's BLAKE2b with `blake2b_simd` (24 files) — second BLAKE2 swap |
-| 2020-10-27 | `zcash/zcash` | `d0a5343da` | Jack Grigg | Lint: include-guard fixes |
-| 2021-11-12 | `zcash/zcash` | `e05c1ddf8` | Dimitris Apostolou | Typo fixes |
-| 2022-05-26 | `zcash/zcash` | `df08281f2` | Jack Grigg | Migrate BLAKE2b Rust FFI to `cxx` — third BLAKE2 swap |
-| 2023-03-08 | `zcash/zcash` | `dd246587a` | Daira-Emma Hopwood | "Fix bit-rotted code in miner tests" |
-| 2024-01-04 | `zcash/librustzcash` | `45652a21a` | Jack Grigg | "Import Tromp solver" — re-imports the same frozen zcashd copy into librustzcash, still pinned to the 2016-10-20 snapshot |
-| 2024-01-04 | `zcash/librustzcash` | `3aaeb8b71`, `45e7238b8` | Jack Grigg | Convert to compile as plain C; pass `blake2b_simd` bindings as callbacks (fourth BLAKE2 wiring change) |
-| 2024-01-11 | `zcash/librustzcash` | `b737d0fe2` | teor | **"Remove unused thread support to enable Windows compilation"** — this is the commit that turned tromp's genuine multi-threading into the single-worker path the crate ships today; done for Windows portability, not performance |
-| 2026-05-29 | `zcash/librustzcash` | `e8b9f299d` | Danny Willems | Remove unused variable, most recent touch |
-
-**Reading:** every hand that touched this code after 2016 changed *how it's
-wired* (BLAKE2 backend, threading, build system, FFI layer) — four separate
-BLAKE2 rewirings and one deliberate threading removal — but nobody resynced
-the actual Wagner-search solver logic against tromp's upstream improvements.
-`b737d0fe2` names its own reason precisely (Windows build compatibility), so
-the single-thread limitation is a known, deliberate, dated trade-off, not an
-oversight — but it does mean a faster or GPU-capable dev solver would need to
-either restore that removed pthread code or port from tromp's current
-upstream state directly, not from what Zebro currently depends on.
 
 ## Group B — node track (Zebro)
 

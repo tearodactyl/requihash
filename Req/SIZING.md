@@ -6,78 +6,125 @@ regularity-repaired construction; the source paper's own artifact repo calls
 it Sequihash — see §0), at k ∈ {5, 7, 9}, across a range of n from a
 sub-millisecond validation case to parameters requiring hundreds of GB to
 mine. Same core assumptions throughout (SPEC.md's construction); naive
-full-materialization memory alongside the paper's own closed-form
-index-pointer estimators for both variants — **formulas transcribed from the
-paper, not measurements of running code, except §2a, which is measured.**
-
-**Correction notice (this revision):** the first version of this table
-calibrated the Equihash index-pointer column against a "~49 MB at (200,9)"
-figure carried in `~/Work/ZK/ZKs/Equihash.md` and repeated in this document.
-That figure was never checked against the source. It has now been checked
-against the paper's own artifact repo (`tl2cents/Generalized-Birthday-Problem`,
-`esitmator/regular-Equihash.ipynb`) and does not match any formula the paper
-actually computes; the correct figure at (200,9) is **94 MB**
-(`single_list_ip_mem_estimator`). This revision replaces the calibrated model
-with the paper's exact formula, computed directly — no calibration needed, and
-no more accurate-by-anchor-point-only risk. See §0 for the full correction
-trail. `Equihash.md`'s "~49 MB" citation needs the same fix (flagged, not yet
-applied there as of this writing).
+full-materialization memory alongside the paper's own published Table 3
+figures for both variants — **the published-table figures are transcribed
+from the paper's PDF directly, not derived from any formula; the two
+"index-pointer" columns' provenance is stated precisely per-column in §1,
+because this document previously got that provenance wrong once already
+(§0a) and a second silent error is not acceptable.**
 
 ## 0. Naming note
 
-The paper's own artifact repo names this construction **Sequihash**
-throughout (README, code, notebook headers) — the eprint listing's title
-itself is "On the Regularity of the Generalized Birthday Problem" (verified
-directly against `eprint.iacr.org/2025/1351`); "Sequihash" is the name used
-internally by the paper's authors for their construction. This project keeps
-its own established name, **Requihash**, deliberately — not a transcription
-error to fix, a project naming choice, stated here only so a reader searching
-upstream sources knows to search "Sequihash" or the eprint number, not
-"Requihash" (which was checked directly: search results for "Sequihash" and
-for the eprint number turn up nothing beyond the paper itself and its one
-artifact repo — no independent implementations, no third-party citations,
-no community discussion found as of 2026-07-13).
+The paper (Lili Tang, Yao Sun, Xiaorui Gong, [eprint 2025/1351](https://eprint.iacr.org/2025/1351),
+"On the Regularity of the Generalized Birthday Problem" — full citation and
+three companion 2025 papers by overlapping authors: `~/Work/ZK/Requihash/PAPERS.md`)
+names this construction **Sequihash** throughout its own text, code, and
+artifact repo. This project keeps its own established name, **Requihash**,
+deliberately — this project's implementation predates a careful reading of
+the paper's own naming, and renaming now would cost more clarity than it
+buys. Mentioned here only so a reader searching upstream sources knows to
+search "Sequihash" or the eprint number, not "Requihash": checked directly,
+search results for "Sequihash" and for the eprint number turn up nothing
+beyond the paper itself and its two artifact repos — no independent
+implementations, no third-party citations, no community discussion found as
+of 2026-07-13/14.
 
 **A real, executed correctness check against the paper's own code, not just
-its notebook estimators:** the paper's `GBP-solver/k_list_algorithm.py` is a
-runnable Wagner k-list solver (not a KAT/test-vector table — the paper
-publishes no fixed input/output pairs). Fetched and actually run this session
-at a tiny parameter point (n=24, k=2^3, a fixed nonce): it found 3 solutions
-and self-verified one (`hashval == 0` XOR check passed). This confirms the
+its published tables:** the paper's `GBP-solver/k_list_algorithm.py` (in the
+`tl2cents/Generalized-Birthday-Problem` repo) is a runnable Wagner k-list
+solver — not a KAT/test-vector table; the paper publishes no fixed
+input/output pairs anywhere. Fetched and actually run this session at a tiny
+parameter point (n=24, k=2^3, a fixed nonce): it found 3 solutions and
+self-verified one (`hashval == 0` XOR check passed). This confirms the
 solver code is real and runs, and gives one genuinely executed reference
-point — it does not, by itself, validate any of the memory/time formulas
-below, which are separate closed-form estimators in a different file
-(`esitmator/regular-Equihash.ipynb`), not derived from running this solver.
+point — it does not, by itself, validate any of the memory/time figures
+below, which come from the paper's *published tables*, a separate artifact.
+
+## 0a. Correction trail — read this before trusting any number below
+
+This document's memory figures were wrong once already, and the error is
+recorded here in full rather than quietly fixed, because the *mechanism* of
+the error is itself the lesson:
+
+1. **First pass** (session of 2026-07-12/13): built a "naive vs. index-pointer"
+   table calibrating a linear model against a "~49 MB at (200,9)" figure
+   already sitting in `~/Work/ZK/ZKs/Equihash.md`. That 49 MB figure was
+   itself never checked against the paper — it had been carried in this
+   project's documents from an earlier session, ultimately traceable to the
+   paper's own published Table 3, but nobody had opened the PDF to confirm.
+2. **Second pass** (2026-07-13): flagged the 49 MB figure as suspicious and
+   "corrected" it to **94 MB**, reasoning from the paper's companion Jupyter
+   notebook (`esitmator/regular-Equihash.ipynb`, function
+   `single_list_ip_mem_estimator`). This was **itself wrong** — that notebook
+   function computes a different, more conservative estimate than what the
+   paper actually published in its own Table 3. The "correction" replaced a
+   right answer with a wrong one, because a formula in a companion artifact
+   was trusted over the paper's own printed table.
+3. **This pass** (2026-07-14): obtained the actual PDF (`~/Downloads/2025-1351.pdf`)
+   and read Table 3 on page 31 directly. **The published table says 2^28.6
+   bits ≈ 49 MB for Equihash(200,2^9) and 2^30.8 bits ≈ 223 MB for
+   Sequihash(200,2^9).** The original 49 MB was correct all along.
+   Root-caused precisely: Table 3's Equihash memory column matches
+   Proposition 4's plain `O(n·N)` bound with constant ≈1 (computed directly:
+   `n·N` at (200,9) = 2^28.64 bits, matching the table's 2^28.6 almost
+   exactly); it does *not* match the appendix's Proposition 7, which derives
+   a *different* index-pointer bound (`2·(n+k−ℓ−1)·N`, giving 94 MB) for the
+   same parameters. **The paper contains two different single-list memory
+   estimates in two different places, and they do not agree with each
+   other** — Table 3 in the main text (§5.2) uses the simpler Proposition-4
+   bound; the appendix's Proposition 7 gives a more detailed derivation that
+   happens to come out larger. Neither is "the wrong one" in an absolute
+   sense — they're bounding different things (a loose big-O headline vs. a
+   worked-through peak-memory derivation) — but citing one while believing
+   it's the other is the exact error made twice in this document's history.
+
+**The standing rule going forward:** any figure attributed to this paper
+must cite which specific equation/table/page it came from, not just "the
+paper's estimator" — because the paper itself is not internally consistent
+across its own artifacts, and a citation without a locator cannot be checked
+by the next person (including a future instance of this project).
 
 ## 1. Method and evidence grades
 
-Six figures per row, each with a distinct evidence grade — stated per column,
-not implied:
+Six figures per row, each with a distinct evidence grade — stated per
+column, not implied:
 
-| Column | Formula | Grade |
+| Column | Formula / source | Grade |
 |---|---|---|
 | `ell` (collision bit length) | `n / (k+1)` | Definitional |
 | Init list size `N` | `2^(ell+1)` | Definitional |
-| Solution size (minimal / compact) | `2^k·(ell+1)/8` and `2^k·ell/8` bytes | **Measured** — computed by `Params::solution_width`/`compact_width` in `rust/src/lib.rs`, exercised by the `table3_wire_sizes` test |
+| Solution size (minimal / compact) | `2^k·(ell+1)/8` and `2^k·ell/8` bytes | **Measured** — computed by `Params::solution_width`/`compact_width` in `rust/src/lib.rs`, exercised by the `table3_wire_sizes` test; also matches the paper's own published Table 3 solution-size column exactly at every row checked |
 | Verify hashes (m=1) | `2^k` | Definitional; the `m` multiplier (SPEC.md §5–6) scales this linearly and is orthogonal to the table below |
-| Naive peak memory | `N · (n/8 + 4)` bytes | **Formula only, and now known to be WRONG by 20–50×** — this was called "measured shape" in the prior revision. It is not. §2a below reports an actual counting-allocator measurement of this repo's real `solve_reference`/`solve_arena` at four parameter points: the true peak exceeds this formula by 20–52×, because per-row `Vec<u8>`/`Vec<u32>` heap allocation overhead (allocator bookkeeping, capacity rounding — exactly the cost BENCHMARK.md's time-profiling already found dominant) is not modeled at all. The formula only counts raw payload bytes. Every "naive peak mem" figure in the table below (§2) inherits this same underestimate and should be read as a payload-only lower bound, not a memory requirement |
-| Index-pointer peak, Equihash | `2·(n + k − ell − 1) · N` bits — the paper's `single_list_ip_mem_estimator`, evaluated exactly (fetched and run against `esitmator/regular-Equihash.ipynb` in the paper's own artifact repo, 2026-07-13) | **Formula only, unverified against any running code.** No index-pointer solver exists in this repo (PLAN.md A6) or has been run by this project. This is a transcription of the paper's own asymptotic estimator, correctly reproducing what the notebook computes — it is not evidence that any real implementation actually achieves this figure. Given §2a's finding that a much simpler naive formula was wrong by 20–50×, this asymptotic estimator should not be assumed accurate either until checked against a real index-pointer implementation (tromp's `equi_miner.h`, upstream — not the stripped single-thread crate port; see PLAN.md A6/A15) |
-| Index-pointer peak, Sequihash/Requihash | `((k²+5k+2)/4·ell + 2^(k−1)) · N` bits — the paper's `best_k_list_memory_trade_off` at its optimal trim `t=1`, which is what the paper's own Table 3 (`M_sgbp`) actually reports, verified by replicating the notebook's computation directly | **Formula only, unverified against any running code** — same caveat as the row above. This repo has not implemented and run this variant either |
+| Naive peak memory | `N · (n/8 + 4)` bytes | **Formula only, and known to be WRONG by 20–52× against this repo's own real code** — see §2a: a counting-allocator measurement of `solve_reference`/`solve_arena` shows the true peak far exceeds this payload-only formula, because per-row `Vec<u8>`/`Vec<u32>` heap allocation overhead is not modeled at all. Every "naive peak mem" figure in §2's table inherits this same underestimate |
+| Equihash memory (published) | Paper's own **Table 3** (page 31), transcribed directly from the PDF at the seven (n,k) points the paper lists; **not** independently computed by this project for those rows. Extrapolated to other (n,k) in the sweep below using Proposition 4's `O(n·N)` bound at constant 1, which exactly reproduces the paper's own Table 3 value at every point checked (verified: (200,9) → 2^28.64 computed vs. 2^28.6 published) | **Published-table where the paper lists it; formula-extrapolated (Proposition 4, constant 1) elsewhere, extrapolation validated against every published point it can be checked against** |
+| Requihash/Sequihash memory (published) | Paper's own **Table 3**, same treatment; extrapolated elsewhere via **Proposition 6** (`(k²+5k+2)/4·ell + 2^(k−1)) · N` bits — the k-list-with-index-trimming bound, which is the formula that actually reproduces the paper's Table-3 Sequihash column, confirmed at (200,9): computes 2^30.8, matching the table exactly) | **Published-table where listed; formula-extrapolated (Proposition 6) elsewhere, validated the same way** |
 
-**What this table is not:** a benchmark. No wall-clock time appears. It is a
-memory/size *sizing* reference — how big each artifact gets — separate from
-the throughput numbers in BENCHMARK.md. It is also not a claim that either
-index-pointer solver exists in this repo — neither does (PLAN.md A6, not
-started); both index-pointer columns are the paper's own asymptotic
-estimators, evaluated exactly, not measurements of running code.
+**A distinct, separate, and unverified formula exists in the same paper**
+(Proposition 7, appendix D.2: `2·(n+k−ℓ−1)·N` bits) that computes 94 MB at
+(200,9) — larger than Table 3's 49 MB for the same nominal parameters. This
+document does **not** use Proposition 7 for its Equihash column, having
+learned the hard way (§0a) that doing so silently contradicts the paper's
+own headline table. Proposition 7 is recorded here, not deleted, because it
+is a real formula in a real paper and a future reader should be able to find
+it and understand why it isn't the one used: it appears to bound a
+different, more pessimistic implementation strategy than whatever produced
+Table 3, and the paper does not reconcile the two anywhere this project has
+found.
+
+**What this table is not:** a benchmark. No wall-clock time appears. It is
+a memory/size *sizing* reference — how big each artifact gets — separate
+from the throughput numbers in BENCHMARK.md. It is also not a claim that
+either index-pointer solver exists in this repo — neither does (PLAN.md A6,
+not started); the memory columns are the paper's own published/extrapolated
+figures, not measurements of running code in this repo.
 
 ## 2a. Actually measured: real peak allocation vs. the naive formula
 
 Built and run this session: `rust/src/bin/req_memcheck.rs`, a global
 counting allocator wrapped around this repo's own `solve_reference` and
 `solve_arena`, executed at real parameters (`cargo run --release --bin
-req_memcheck`). This is the one row of this document backed by executed
-code rather than a transcribed or derived formula.
+req_memcheck`). This is the one section of this document backed by executed
+code rather than a transcribed or extrapolated formula.
 
 | (n,k) | formula (§1's naive model) | measured peak, `solve_reference` | measured peak, `solve_arena` | ratio (reference) |
 |---|---|---|---|---|
@@ -90,119 +137,148 @@ At (96,5) this works out to ~443 measured bytes per row against the
 formula's assumed 16 — a ~28× per-row overhead, consistent with
 BENCHMARK.md's independent finding (via time profiling, not memory
 profiling) that per-row heap allocation is ~59% of `solve_reference`'s
-runtime. The two findings corroborate each other via different
-instruments, which is exactly the kind of cross-check this document should
-have had from the start. **This measurement does not extend past (96,5)**
-— (144,5) and beyond were not run this session (the naive Python k-list
-solver used for the earlier real-code check, run separately above, already
-demonstrated how slow an unoptimized solve gets; this repo's own Rust
-solvers are much faster but were not pushed to (144,5) in this pass). Every
-figure at (144,5) and larger in §2's table remains pure arithmetic,
-unverified against any execution, naive or otherwise.
+runtime. The two findings corroborate each other via different instruments.
+**This measurement does not extend past (96,5)** — (144,5) and beyond were
+not run this session. Every figure at (144,5) and larger in §2's table
+remains pure arithmetic (paper-published or paper-extrapolated), unverified
+against any execution of this project's own code.
 
 ## 2. The table
 
-k = 5, 7, 9; n swept from a trivial validation case to parameters whose naive
-peak memory reaches multi-TB (the "hundreds of GB" case sits mid-table for
-each k; going further is definitional continuation, not a new regime).
+k = 5, 7, 9; n swept from a trivial validation case to parameters whose
+naive peak memory reaches multi-TB. **Every row below is this project's own
+extrapolation** via Proposition 4 (Equihash) / Proposition 6 (Requihash) at
+constant 1, computed fresh for this table (none of these exact (n,k) points
+duplicate the paper's own published Table 3 rows, which are listed
+separately just below for direct comparison). Both formulas were validated
+against **all seven** of the paper's own published Table 3 rows (not just
+one point) before use here — every prediction matched the published value
+to within ±0.04 in log2 bits, consistent with the paper's one-decimal
+rounding. Full validation arithmetic: `Req/SIZING.md` git history / this
+session's working notes.
 
-**All memory figures below are formula arithmetic, not measurements**, except
-where they overlap the four rows actually measured in §2a — and §2a already
-showed the naive formula underestimates real peak memory by 20–52× at every
-point it checked. Treat every "naive peak mem" entry below as a payload-only
-floor, not an expected real requirement; treat both index-pointer columns as
-unverified paper transcriptions (§1's grade column). Do not read the table
-below as validated.
-
-| k | n | ell | init list N | sol size (min/compact) | verify hashes (m=1) | naive peak mem | index-pointer peak, Equihash (exact) | index-pointer peak, Sequihash/Requihash (exact) |
+| k | n | ell | init list N | sol size (min/compact) | verify hashes (m=1) | naive peak mem (this repo's formula) | Equihash memory (extrapolated) | Requihash memory (extrapolated) |
 |---|---|---|---|---|---|---|---|---|
-| 5 | 24 | 4 | 2^5 | 20/16 B | 32 | 224 B | 192 B | 272 B |
-| 5 | 48 | 8 | 2^9 | 36/32 B | 32 | 5.0 KB | 5.5 KB | 7.5 KB |
-| 5 | 96 | 16 | 2^17 | 68/64 B | 32 | 2.0 MB | 2.6 MB | 3.5 MB |
-| 5 | 144 | 24 | 2^25 | 100/96 B | 32 | 704 MB | 992 MB | 1.28 GB |
-| 5 | 168 | 28 | 2^29 | 116/112 B | 32 | 12.5 GB | 18.0 GB | 23.8 GB |
-| 5 | 192 | 32 | 2^33 | 132/128 B | 32 | 224 GB | 328 GB | 432 GB |
-| 5 | 216 | 36 | 2^37 | 148/144 B | 32 | 3.9 TB | 5.75 TB | 7.6 TB |
-| 7 | 32 | 4 | 2^5 | 80/64 B | 128 | 256 B | 272 B | 600 B |
-| 7 | 96 | 12 | 2^13 | 208/192 B | 128 | 128 KB | 180 KB | 322 KB |
-| 7 | 168 | 21 | 2^22 | 352/336 B | 128 | 100 MB | 153 MB | 258 MB |
-| 7 | 200 | 25 | 2^26 | 416/400 B | 128 | 1.81 GB | 2.83 GB | 4.70 GB |
-| 7 | 232 | 29 | 2^30 | 480/464 B | 128 | 33.0 GB | 52.3 GB | 85.9 GB |
-| 7 | 264 | 33 | 2^34 | 544/528 B | 128 | 592 GB | 948 GB | 1.51 TB |
-| 7 | 296 | 37 | 2^38 | 608/592 B | 128 | 10.25 TB | 16.56 TB | 26.9 TB |
-| 9 | 40 | 4 | 2^5 | 320/256 B | 512 | 288 B | 352 B | 1.5 KB |
-| 9 | 120 | 12 | 2^13 | 832/768 B | 512 | 152 KB | 232 KB | 640 KB |
-| 9 | 200 | 20 | 2^21 | 1344/1280 B | 512 | 58.0 MB | **94.0 MB** | 224 MB |
-| 9 | 240 | 24 | 2^25 | 1600/1536 B | 512 | 1.06 GB | 1.75 GB | 4.0 GB |
-| 9 | 280 | 28 | 2^29 | 1856/1792 B | 512 | 19.5 GB | 32.5 GB | 72.0 GB |
-| 9 | 320 | 32 | 2^33 | 2112/2048 B | 512 | 352 GB | 592 GB | 1.25 TB |
-| 9 | 360 | 36 | 2^37 | 2368/2304 B | 512 | 6.12 TB | 10.4 TB | 22.0 TB |
+| 5 | 24 | 4 | 2^5 | 20/16 B | 32 | 224 B | 96 B | 272 B |
+| 5 | 48 | 8 | 2^9 | 36/32 B | 32 | 5.0 KB | 3.0 KB | 7.5 KB |
+| 5 | 72 | 12 | 2^13 | 52/48 B | 32 | 104.0 KB | 72.0 KB | 172.0 KB |
+| 5 | 168 | 28 | 2^29 | 116/112 B | 32 | 12.5 GB | 10.5 GB | 23.8 GB |
+| 5 | 192 | 32 | 2^33 | 132/128 B | 32 | 224.0 GB | 192.0 GB | 432.0 GB |
+| 5 | 216 | 36 | 2^37 | 148/144 B | 32 | 3.9 TB | 3.4 TB | 7.6 TB |
+| 7 | 32 | 4 | 2^5 | 80/64 B | 128 | 256 B | 128 B | 600 B |
+| 7 | 96 | 12 | 2^13 | 208/192 B | 128 | 128.0 KB | 96.0 KB | 322.0 KB |
+| 7 | 168 | 21 | 2^22 | 352/336 B | 128 | 100.0 MB | 84.0 MB | 257.8 MB |
+| 7 | 232 | 29 | 2^30 | 480/464 B | 128 | 33.0 GB | 29.0 GB | 85.9 GB |
+| 7 | 264 | 33 | 2^34 | 544/528 B | 128 | 592.0 GB | 528.0 GB | 1.5 TB |
+| 7 | 296 | 37 | 2^38 | 608/592 B | 128 | 10.2 TB | 9.2 TB | 26.9 TB |
+| 9 | 40 | 4 | 2^5 | 320/256 B | 512 | 288 B | 160 B | 1.5 KB |
+| 9 | 120 | 12 | 2^13 | 832/768 B | 512 | 152.0 KB | 120.0 KB | 640.0 KB |
+| 9 | 240 | 24 | 2^25 | 1600/1536 B | 512 | 1.1 GB | 960.0 MB | 4.0 GB |
+| 9 | 280 | 28 | 2^29 | 1856/1792 B | 512 | 19.5 GB | 17.5 GB | 72.0 GB |
+| 9 | 320 | 32 | 2^33 | 2112/2048 B | 512 | 352.0 GB | 320.0 GB | 1.2 TB |
+| 9 | 360 | 36 | 2^37 | 2368/2304 B | 512 | 6.1 TB | 5.6 TB | 22.0 TB |
 
-The (200,9) row is bold in the Equihash column: 94.0 MB is the corrected,
-exact figure (was wrongly given as 49.0 MB, calibrated, in the prior
-revision). The Sequihash/Requihash column's 224 MB independently reproduces
-the paper's cited Table 3 figure at (200,9).
+### 2b. The paper's own published Table 3, verbatim (page 31 of the PDF)
+
+Given directly, no extrapolation, for comparison against the sweep above —
+this is what the correction trail in §0a is about, and it is worth having
+in full rather than cherry-picked:
+
+| (n, K) | Equihash Time | Equihash Mem. | Equihash Sol-Size | Sequihash Time | Sequihash Mem. | Sequihash Sol-Size |
+|---|---|---|---|---|---|---|
+| (96, 2^5) | 2^19.3 | 2^23.6 | 68 B | 2^22.6 | 2^24.8 | 64 B |
+| (128, 2^7) | 2^19.8 | 2^24.0 | 272 B | 2^24.6 | 2^25.7 | 256 B |
+| (160, 2^9) | 2^20.2 | 2^24.3 | 1088 B | 2^26.6 | 2^26.6 | 1024 B |
+| (144, 2^5) | 2^27.3 | 2^32.2 | 100 B | 2^30.6 | 2^33.4 | 96 B |
+| (150, 2^5) | 2^28.3 | 2^33.2 | 104 B | 2^31.6 | 2^34.4 | 100 B |
+| (200, 2^9) | 2^24.2 | 2^28.6 | 1344 B | 2^30.6 | 2^30.8 | 1280 B |
+| (288, 2^8) | 2^36.0 | 2^41.2 | 1056 B | 2^41.6 | 2^42.9 | 1024 B |
+
+In MB/GB (bits ÷ 8, verified by direct computation — memory columns in Table
+3 are bit counts, per the paper's own convention stated in §1 above): (96,5)
+2^23.6 ≈ **1.5 MB** / 2^24.8 ≈ **3.5 MB**; (128,7) 2^24.0 = **2.0 MB** /
+2^25.7 ≈ **6.5 MB**; (160,9) 2^24.3 ≈ **2.5 MB** / 2^26.6 ≈ **12.1 MB**;
+(144,5) 2^32.2 ≈ **588 MB** / 2^33.4 ≈ **1.3 GB**; (150,5) 2^33.2 ≈
+**1.1 GB** / 2^34.4 ≈ **2.6 GB**; (200,9) 2^28.6 ≈ **48.5 MB** / 2^30.8 ≈
+**223 MB**; (288,8) 2^41.2 ≈ **294 GB** / 2^42.9 ≈ **955 GB**. (The
+narrative text on page 31 rounds (200,9) to "49 MB"/"223 MB" — consistent
+with 48.5/223 here to the precision the paper itself uses.)
 
 ## 3. Readings
 
 - **Solution size and verify cost are k-only, n-independent in count** (32,
-  128, 512 hashes for k=5,7,9 respectively) but grow linearly in bytes with n
-  — the (n, k) split is exactly the "verification cheapness vs. memory
-  hardness" dial the algorithm exposes, visible directly in column 4 vs. 6.
-- **The index-pointer trick does not reduce memory below the naive figure at
-  most points in this sweep — the opposite of this table's prior claim.**
-  With the corrected exact formulas, the Equihash index-pointer estimator is
-  *larger* than this table's naive figure everywhere except the very smallest
-  parameters (k=5/n=24 and k=7/n=32 are the only two rows where index-pointer
-  wins, both trivially small). This is not a contradiction of the historical
-  record — it reflects that the paper's `single_list_ip_mem_estimator` and
-  this table's "naive" column are not modeling the same baseline: the paper's
-  formula already assumes truncated indices and is optimizing for asymptotic
-  behavior at the parameter regime index pointers were designed for (large k,
-  where per-node index-list overhead dominates), not for a head-to-head at
-  every (n,k) point on this sweep. **This is flagged, not resolved** — it
-  means either this table's "naive" formula or the paper's index-pointer
-  formula (or both) needs recalibration against a real implementation before
-  either column can be trusted as a genuine comparison. The safest current
-  reading: only the Sequihash-vs-Equihash *ratio* (next bullet), computed from
-  the same two paper formulas on the same basis, is likely reliable; neither
-  index-pointer column should be compared against the "naive" column without
-  further verification.
-- **Sequihash/Requihash costs 1.3–2.4× the Equihash index-pointer memory at
-  matched (n,k)**, and the ratio grows with k (k=5/n=144: 1.32×; k=7/n=200:
-  1.66×; k=9/n=200: 2.38×) — smaller than this table's prior (incorrect)
-  claim of "2–5×, growing to 4.6×," but the qualitative finding survives:
-  regularity costs more memory, and progressively more so as k grows, which
-  the `(k²+5k+2)/4` term (quadratic in k) predicts against the Equihash
-  formula's k-linear term.
-- **The "hundreds of GB" case** lands at k=5/n=192, k=7/n=264, k=9/n=320 —
-  each a legitimate n%(k+1)==0, n%8==0 parameter choice, none deployed by any
-  known chain (the Equihash-family ecosystem survey in `~/Work/ZK/ZKs/Equihash.md`
-  §4 tops out at (200,9) and (144,5); nothing in that table approaches this
-  memory class).
+  128, 512 hashes for k=5,7,9 respectively) but grow linearly in bytes with
+  n — the (n, k) split is exactly the "verification cheapness vs. memory
+  hardness" dial the algorithm exposes.
+- **Requihash costs roughly 2.3–4.9× the Equihash memory at matched (n,k)**,
+  computed directly from the paper's own published Table 3 ratios (§2b), not
+  an extrapolation: (96,5) and (144,5) both give **2.30×**; (128,7) and
+  (288,8) both give **3.25×**; (160,9) gives **4.92×**; (200,9) gives
+  **4.59×** (the paper's own stated round number is "a factor of 4.6" — this
+  document's arithmetic matches it exactly). The pattern across k is
+  suggestive (k=5 rows cluster near 2.3×, k=9 rows near 4.6–4.9×, k=7 rows
+  near 3.25×) but is not a clean single-variable function of k alone since
+  it also depends on n within each k — treat "the ratio grows with k" as
+  directionally supported, not a precise closed form, without deriving one
+  from just two or three points. This document's earlier (now-corrected)
+  claim of "1.3–2.4×, growing with k" used the wrong Equihash-side formula
+  (Proposition 7, 94 MB at (200,9) instead of the published 49 MB) and is
+  retired along with that figure.
+- **The index-pointer trick barely beats this repo's own "naive" formula at
+  (200,9)** — 58.0 MB (naive) vs. 48.5 MB (published Equihash) is only a
+  **~1.2×** difference, not the large win intuition might suggest. This is
+  almost certainly because this repo's "naive peak memory" formula (§1) is
+  *already* a fairly compact model (raw payload only, no allocator
+  overhead — confirmed too low by 20–52× against real measured code, §2a),
+  so it isn't a fair "no optimization at all" baseline to begin with; a
+  genuinely naive full-index-storage implementation would need a different,
+  larger formula (e.g. storing full `2^k`-length index vectors per row
+  rather than the truncated/compact representation this repo's formula
+  already assumes) to show the historically-cited index-pointer win
+  properly. That larger, truly-naive formula has not been built or
+  validated in this document — flagged as unresolved, not asserted.
 
-## 4. What this table does not answer
+## 4. A fourth data point: 2025/2141's own claimed implementation numbers
+
+Distinct from everything above — this is neither this document's model nor
+1351's asymptotic Table 3, but a **third paper's own claimed implementation
+figures** (Tang, Ding, Sun, Gong, [eprint 2025/2141](https://eprint.iacr.org/2025/2141),
+"Memory Optimizations of Wagner's Algorithm with Applications to Equihash" —
+overlapping authors with 1351; full citation `~/Work/ZK/Requihash/PAPERS.md`).
+Quoted directly from the abstract and body text (page 5): **"For Equihash(144,5),
+our optimized algorithm requires only 700 MB of memory, compared to
+approximately 2.5 GB in previous implementations"**; body text: *"Compared to
+state-of-the-art software implementations in [Tromp], our baseline
+implementation for Equihash(144,5) achieves nearly the same runtime, while
+requiring only 1.45 GB of memory (0.57× of Tromp's 2.5 GB footprint).
+Moreover, by accepting roughly a 2× time penalty factor, the peak memory can
+be further reduced to 700 MB (0.28× of Tromp's)."*
+
+This is a genuinely different kind of number from everything else in this
+document: **it is the paper's own claim about its own implementation's
+measured behavior**, attributed by name to "Tromp" as the baseline being
+improved on (i.e. this paper claims Tromp's own (144,5) implementation uses
+~2.5 GB) — not a Wagner-framework asymptotic estimate. It has not been
+independently verified by this project (their code is at
+`github.com/tl2cents/Wagner-Algorithms`, not yet cloned or run here) and
+should not be conflated with 1351's Table 3 figures above, which are for a
+different parameter regime's asymptotic model, not a measured software
+footprint. Recorded here as a fourth, clearly-labeled reference point, not
+merged into the table.
+
+## 5. What this table does not answer
 
 Time cost (steepness under memory reduction — PLAN.md A5, not started);
-whether the "naive" solvers in this repo actually *achieve* the modeled peak
-at large n (only measured up to (96,5)/(144,5) per BENCHMARK.md; the TB-scale
-rows are pure arithmetic, unexercised); and — now the more pressing gap — why
-the two "exact" formulas in this table disagree so sharply with the informal
-"index pointers roughly halve memory" intuition the historical record (§9 of
-`Equihash.md`) reports for real solvers (tromp: ~144 MB at (200,9), stated in
-`equi_miner.c`'s own source comment to already assume a `SAVEMEM = 9/14`
-bucket-sizing tradeoff "with negligible discarding"; xenoncat: 178 MB fixed
-context, a different implementation with its own layout). None of the three
-numbers here (this table's naive 58 MB, this table's formula-derived 94 MB,
-and tromp's real ~144 MB) agree on a single consistent basis. One numeric
-curiosity, flagged as *unconfirmed and likely coincidental* rather than a
-finding: undoing tromp's stated 9/14 SAVEMEM factor (144 ÷ 9/14) lands almost
-exactly on 224 MB — this table's *Sequihash/Requihash* figure, not its
-Equihash one. No algebraic connection between tromp's bucket-sizing tradeoff
-and the paper's k-list memory formula has been shown; this is likely
-arithmetic accident, not evidence of anything, and is recorded only so a
-future pass doesn't rediscover it and over-read it. Reconciling what tromp's
-144 MB actually measures (peak resident set of the real C program, including
-bucket-table padding neither formula in this table models) against the two
-closed-form estimators is the immediate next-highest-priority correction,
-ahead of extending this table further — tracked in PLAN.md as a new item.
+whether this repo's own naive solvers actually *achieve* either the
+formula's or the paper's peak at large n (only measured up to (96,5) per
+§2a; the TB-scale rows are pure arithmetic, unexercised); and reconciling
+tromp's real measured ~144 MB at (200,9) (`equi_miner.c`'s own comment: a
+`SAVEMEM = 9/14` bucket-sizing tradeoff "with negligible discarding" applied
+on top of some unstated baseline) against the paper's 49 MB Table-3 figure
+for the same nominal parameters — these do not obviously agree either (144
+vs. 49 MB is a ~3× gap), and reconciling what tromp's real C implementation
+actually holds resident against the paper's asymptotic Proposition 4 bound
+remains open, tracked in PLAN.md. The earlier "144 ÷ 9/14 ≈ 224 MB" numeric
+observation from this document's prior revision is **retracted along with
+the 94 MB figure it was compared against** — it was coincidental arithmetic
+built on an error and should not be re-derived or over-read in any future pass.

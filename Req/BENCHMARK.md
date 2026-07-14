@@ -308,9 +308,34 @@ C++/libsodium path. What is true, and is the real asymmetry: no *published
 Rust crate* wraps that NEON code the way `blake3` wraps its own — the gap is
 in packaging and crate maintenance, not in whether BLAKE2b NEON code exists.
 Vendoring `BLAKE2/BLAKE2`'s `neon/` directly into a fourth `HashKind` here
-would be the apples-to-apples fix, not yet done (tracked in PLAN.md). Still
-pending, unrelated to the above: an x86-64/AVX2 leg, where `blake2b_simd`'s
-4-way path should narrow the gap (deprioritized, PLAN.md A7).
+would be the apples-to-apples fix, not yet done (tracked in PLAN.md A13).
+Still pending, unrelated to the above: an x86-64/AVX2 leg, where
+`blake2b_simd`'s 4-way path should narrow the gap (deprioritized, PLAN.md A7).
+
+**Can blake2b's NEON path be made "just as automatic" as blake3's? Checked
+directly, and the honest answer is no, not by copying blake3's mechanism —
+the two crates are architecturally different at the point that matters.**
+`blake3`'s automaticity comes from its `build.rs`: it shells out to a C
+compiler at build time and sets `cargo:rustc-cfg=blake3_neon` whenever
+`is_aarch64() && is_little_endian()`, with zero user action needed, because
+blake3 was designed from the start around a build-script-driven C/Rust FFI
+boundary for every SIMD backend (x86 assembly, AVX-512 intrinsics, and NEON
+C intrinsics all go through the same mechanism). `blake2b_simd` has **no
+`build.rs` at all** (confirmed: no such file in the crate) — its `avx2.rs`
+and `sse41.rs` backends are pure Rust, selected by a plain
+`#[cfg(target_arch = "x86"/"x86_64")]` gate plus a runtime CPUID check, no
+C compilation step anywhere in its pipeline. There is no existing hook to
+extend with a NEON branch; someone would have to (a) write a `neon.rs` in
+pure Rust using `core::arch::aarch64` intrinsics — translating, not simply
+vendoring, `BLAKE2/BLAKE2`'s C `blake2b-neon.c` — and (b) add the
+`#[cfg(target_arch = "aarch64")]` gate to select it, which *would* then be
+just as automatic as blake3's dispatch (no separate feature flag needed,
+same as blake3) — but the code to gate does not exist yet in any Rust crate
+found by this project. So: the *automaticity mechanism* (a `#[cfg]` gate,
+no user action) is trivially portable to blake2b once the NEON code exists
+in Rust; the *NEON code itself* is not portable without a genuine port from
+C intrinsics to `core::arch::aarch64` intrinsics, which is real, non-trivial
+work nobody has done publicly as far as this project has checked.
 
 **Substitution attribution at (96,5), m=1:**
 

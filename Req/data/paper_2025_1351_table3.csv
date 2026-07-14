@@ -1,0 +1,8 @@
+n,k,equihash_time_log2,equihash_mem_log2,equihash_mem_bytes,equihash_sol_bytes,requihash_time_log2,requihash_mem_log2,requihash_mem_bytes,requihash_sol_bytes,source
+96,5,19.3,23.6,1589344,68,22.6,24.8,3651354,64,published_table
+128,7,19.8,24.0,2097152,272,24.6,25.7,6813667,256,published_table
+160,9,20.2,24.3,2581897,1088,26.6,26.6,12714752,1024,published_table
+144,5,27.3,32.2,616702733,100,30.6,33.4,1416810831,96,published_table
+150,5,28.3,33.2,1233405467,104,31.6,34.4,2833621662,100,published_table
+200,9,24.2,28.6,50859008,1344,30.6,30.8,233686637,1280,published_table
+288,8,36.0,41.2,315751799532,1056,41.6,42.9,1025880623293,1024,published_table
