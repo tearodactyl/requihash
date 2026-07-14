@@ -24,6 +24,10 @@ path = "src/bin/req_bench.rs"
 name = "req_profile"
 path = "src/bin/req_profile.rs"
 
+[[bin]]
+name = "req_vecencode"
+path = "src/bin/req_vecencode.rs"
+
 [profile.release]
 opt-level = 3
 lto = true

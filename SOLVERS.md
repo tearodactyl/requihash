@@ -1,24 +1,239 @@
-# TROMP.md — the tromp/equihash implementation: complete verified history
+# SOLVERS.md — Equihash solver implementations: the original, xenoncat's derivative, and tromp's history
 
 Every date, commit sha, author, and file listed here was pulled directly from
 the GitHub API (`api.github.com/repos/tromp/equihash`, `zcash/zcash`,
 `zcash/librustzcash`) on 2026-07-13/14, not transcribed from memory or a
 secondary source. Where a claim could not be verified this way, it is marked
-unverified rather than stated as fact. Findings context: `~/Work/ZK/ZKs/Equihash.md`
+unverified rather than stated as fact. Findings context: `~/Work/ZK/ZKs/EquihashSurvey.md`
 §2–3 (the 2016 optimization-wave narrative this document grounds in commit-level
 detail) and `Req/PLAN.md` "A15 detail" (the shorter summary written first, now
 superseded in detail by this document, which that entry should point to instead
 of duplicate).
 
+Sections 0 (original + xenoncat) and 1–7 (tromp) were researched in separate
+sessions from separately cloned repos (`~/Work/ZK/ZKs/equihash-khovratovich`,
+`equihash-xenon`, `equihash-tromp`, `BTCGPU-equihash`) — cross-references
+between the two halves are noted inline where they connect (e.g. tromp's
+README directly narrates his relationship to xenoncat's design). A Node.js
+binding lineage (`khovratovich` → `digitalbazaar` → `161chihuahuas/equihash`,
+2016–2024) was also researched but is deliberately excluded here as
+out-of-scope: this project's own solver work is C++/Rust/assembly, and a
+JS-binding modernization has no bearing on it.
+
 ## Contents
 
-1. Repository facts
+0. The original implementation and xenoncat's derivative (Khovratovich, xenoncat)
+1. Repository facts (tromp)
 2. Full commit history, annotated (2016-10-13 → 2018-08-07)
 3. What each wave of changes actually did
 4. Community contributors, issues, and PRs — including a flagged identity match
 5. Integration into zcashd, then librustzcash, then the `equihash` crate
 6. The frozen snapshot: what zcashd copied and what it never resynced
 7. File inventory: upstream vs. the vendored port
+
+## 0. The original implementation and xenoncat's derivative
+
+### 0.1 `khovratovich/equihash` — the authors' own reference solver
+
+Repo: `github.com/khovratovich/equihash`, created 2016-06-09, last pushed
+2016-09-22 — predates tromp's repo (created 2016-10-13) by about a month and
+predates the entire Zcash Open Source Miner Challenge optimization wave
+entirely. CC0-licensed (public domain, no attribution required). Source is
+`Source/C++11/pow.h` + `pow.cc`, 117 + 218 lines — the whole reference
+implementation is ~335 lines.
+
+**Interface, verified directly from `pow.h`:**
+
+    class Equihash{
+    public:
+        Equihash(unsigned n_in, unsigned k_in, Seed s);
+        Proof FindProof();
+        void FillMemory(uint32_t length);
+        void InitializeMemory();
+        void ResolveCollisions(bool store);
+        std::vector<Input> ResolveTree(Fork fork);
+    };
+
+`n` and `k` are plain constructor arguments — no hardcoded parameter set
+anywhere in the class. The CLI (`README.md`) confirms: `./equihash -n N -k K
+-s Seed`, e.g. `-n 120 -k 5` for a ~32MB instance.
+
+**Recommended parameters, stated in the README, not Zcash's later (200,9):**
+cryptocurrency use `(100/110/120,4)`, `(108/114/120/126,5)`; client-puzzle use
+`(60/70/80/90,4)`, `(90/96/102,5)`. Zcash's (200,9) was a subsequent,
+deliberately harder choice than anything the original authors themselves
+suggested — worth noting given `Equihash.md` F-A9's point about parameter
+choices never being revisited after 2017.
+
+**Memory layout, verified from `pow.cc`'s `InitializeMemory()`:**
+
+    tupleList = std::vector<std::vector<Tuple>>(tuple_n, def_tuples);
+
+Nested `vector<vector<Tuple>>` — one heap allocation per row, the exact
+representation `Req/OPTIMIZATION_HISTORY.md` and `Req/SIZING.md` §2a
+independently found dominates a naive Equihash solver's real allocation cost
+(measured ~59% of samples via time-profiling, 20–52× the "naive formula"
+peak memory via a counting allocator). **This is now directly confirmed**:
+Req's own naive baseline is not a strawman built to make later optimizations
+look good — it structurally matches the original authors' own 2016 reference
+implementation, independently arrived at.
+
+### 0.2 `xenoncat/equihash-xenon` — the index-pointer breakthrough, documented by its own author
+
+Repo: `github.com/xenoncat/equihash-xenon`. Pseudonymous author ("xenoncat").
+Hand-written x86 assembly (NASM/FASM syntax, separate AVX1 and AVX2 code
+paths for Windows and Linux), not portable C/C++ — a materially different
+engineering choice than both the original reference and tromp's later C
+solver. `history.log` gives three dated entries: initial single-threaded
+AVX2-only version 2016-10-13, AVX1 added 2016-10-17, an ASLR bugfix
+2016-10-21 (triggered by a user report, "vattay's OSX ASLR issue").
+
+**A 5-page algorithm-description PDF ships in the repo**
+(`notes/algorithm description.pdf`) — a genuine primary source, xenoncat's
+own account of the (200,9) solver design, worth recording precisely since it
+predates and grounds several things this project has cited secondhand:
+
+- **The binary-tree, no-index-list design.** Each `Pairs` array entry is a
+  32-bit reference to two items in the *previous* stage's `Pairs`/`Xorwork`,
+  not a growing list of raw indices. Recovering the final 512 indices (at
+  k=9) is a backtracking walk: 2 items in `Pairs 8` → 4 in `Pairs 7` → 8 in
+  `Pairs 6` → ... → 512 raw indices from `Pairs 1`. This is the literal
+  mechanism Req's own README describes as "no index-pointer storage yet" —
+  seeing xenoncat's own diagram of it is a direct, dated primary source for
+  what `Req/PLAN.md` A6 needs to port.
+- **256-bucket coarse sort**, chosen empirically: "Earlier implementations
+  experimented with 2048 buckets, 1024 buckets and 512 buckets. Performance
+  is best with 256 buckets." A full bit-allocation table is given per stage
+  (e.g. State 0: bits `[199:192]` select the bucket, `[191:180]` drive the
+  Stage-1 collision search on the remaining 12-bit pattern).
+- **Pairs compression to 32 bits.** A pair of item-IDs `(b, s)` within a
+  bucket (`b` big, `s` small, unordered) is packed via a triangular-number
+  encoding `x = b(b-1)/2 + s`, decoded via `b = round(sqrt(2x+1))`, `s = x -
+  b(b-1)/2`. This packs into 26 bits, leaving 6 of the needed 8 bucket-ID
+  bits — the remaining 2 bits are recovered from which of 4 memory
+  **partitions** the pair was written to (partitioning by source-bucket
+  range, both for multithreading and to make this compression scheme work).
+- **Exact memory total, stated by the author**: "So Equihash (200,9) needs
+  about 15\*11862016 bytes = 178MB." This is the real number behind the
+  `CONTEXT_SIZE 178033152` constant in `README.md`'s API section (matches:
+  178033152 / 11862016 ≈ 15.006, i.e. 15 units of one `Pairs`-array's worth
+  of memory). The PDF documents **two** memory layouts — the one actually
+  shipped in the first solver version, and "an alternative layout... more
+  straightforward" discovered while writing the document itself, which
+  avoids overlap when transitioning between stages. `params.inc`'s
+  `STATE*_DEST` constants (verified in the actual assembly source, not just
+  the PDF) implement this alternative layout directly.
+- **Trivial-solution / duplicate handling**: duplicate detection (e.g. `(A
+  B) xor (A C)`, an invalid double-use of item A) is deliberately *not* done
+  during the main Stage 1–9 loop ("likely not worth the time"); a cheaper
+  partial check runs Stage 4–8 specifically to stop buckets filling with
+  known-trivial partial solutions, and full duplicate detection only happens
+  once, in `GetSolutions` after Stage 9 completes.
+
+**Verified against the actual assembly, not just the PDF's prose.** Two
+files provide ground truth: `Linux/asm/struct_eh.inc` (the `EH` struct
+layout: `hashtab`, `bucket0ptr`/`bucket1ptr`, `workingpairs`, `basemap`,
+`pairs`, `buf`) and `Linux/asm/params.inc` (`BUCKETS = 256`, `PARTS = 4`,
+`ITEMS = 2896`, per-stage `STATE*_BYTES`/`STATE*_OFFSET`/`STATE*_DEST`
+constants) — these match the PDF's description exactly, including the
+"alternative layout" `STATE*_DEST` offsets. `proc_ehsolver_avx2.asm` (894
+lines) is essentially uncommented raw AVX2 (67 semicolons total, mostly
+`rdtsc` timing labels, no algorithmic prose) — **the label skeleton itself
+is the extractable sequencing**, and it maps 1:1 onto the PDF's stage
+model:
+
+    EhSolver: → _LoopBlake2b: (hash generation, fills State 0)
+        → _EhStage1: / _EhStage1inner:  (collision search + XOR, repeats through)
+        → _EhStage9: / _EhStage9inner:
+        → _EhSolverEpilog: / _EhNoSolution:
+        → _ProcEhMakeLinksShr4: / _ProcEhMakeLinks: (tree backtracking = PDF §2)
+        → _LoopCheckDup: / _LoopCheckDupInner: (final duplicate pass = PDF §7)
+        → _LoopBasemap: → _LoopSort1:..._LoopSort4: (canonical ordering)
+
+No algorithmic comments exist in the `.asm` files themselves beyond register/
+stage bookkeeping — the PDF is the only prose documentation of *why*, and it
+is precise enough to reconstruct the design without reading the assembly at
+all. This is worth citing directly rather than through tromp's secondhand
+description whenever this project references "the index-pointer technique."
+
+### 0.3 Tromp's own account of his relationship to xenoncat — a primary source, not inferred
+
+`equihash-tromp/README.md` (142 lines, ungrepped by prior SOLVERS.md research
+since the file wasn't cloned locally until this session) is tromp's own
+first-person narrative, written at submission time, not a later
+retrospective:
+
+> My original submission was triggered by seeing how xenoncat's "has much of
+> the same ideas as mine" so that making my open sourcing conditional on
+> getting sufficient funding for the Cuckoo Cycle Bounty Fund no longer made
+> sense.
+>
+> I noticed that we both use bucket sorting with tree nodes stored as a
+> directed acyclic graph. Upon original submission, I wrote: Compared to
+> xenoncat, my solver differs in having way more buckets, wasting some
+> memory, having simpler pair compression, being multi-threaded, and
+> supporting (144,5). And of course in not using any assembly.
+
+**This directly resolves an open item.** `Req/SIZING.md` §5 flags an
+unreconciled gap: "tromp's real measured ~144 MB at (200,9) does not match
+the paper's published 49 MB for the same nominal parameters (~3× gap)...
+remains open." Tromp's own README states the real number and its direct
+point of comparison:
+
+> My solver now needs only 144MB compared to xenoncat's 178MB.
+
+Both are **real, author-stated implementation memory figures** for (200,9) —
+tromp's 144MB (matching Req's own citation) directly against xenoncat's
+178MB (matching the `CONTEXT_SIZE` constant verified in §0.2 above). Neither
+is the paper's 49MB Table 3 asymptotic estimate; both are larger, and now we
+know *why* to a specific implementation choice (bucket count 2^12 vs 2^8,
+memory-waste tradeoffs tromp names explicitly) rather than an unexplained
+discrepancy. This is not a new mystery to solve — it is two independently
+documented real numbers that were never actually in tension with each
+other, only with the paper's separate asymptotic model. `Req/SIZING.md` §5's
+"remains open" framing should be narrowed: the 144MB-vs-49MB gap is now
+explained (real bucket-sort implementation overhead vs. an O(n·N)
+asymptotic bound), even though the specific bucket-sizing arithmetic inside
+`equi_miner.c` that produces exactly 144MB (as opposed to some other real
+number) is still unexercised by this project.
+
+**Also from the same README, confirming §4 below independently:** "Add
+option -p PREFIX to change intial characters of the personalization string
+(**not implemented in assembly and CUDA solvers**)." This is tromp's own
+statement, from the general usage section (not the commit that added it) —
+independent confirmation that the personalization fix from issue #19 (§4.1
+below) only ever reached the plain CPU miner, never the assembly/GPU paths,
+consistent with commit `191d3b583`'s message "allow command line
+personalization for **plain CPU miners**."
+
+**Performance figures tromp states for his own solver** (4GHz i7-4790K /
+GTX980, from the same README): single-thread `equi1` 4.9 Sol/s, 8-thread
+22.2 Sol/s; GPU (`eqcuda`) 27.2 Sol/s — all at (200,9). At (144,5): 1.0–2.2
+Sol/s at 2.6GB memory (a different, much larger memory footprint at the
+easier-k parameter set — consistent with `Req/SIZING.md`'s own finding that
+memory scales steeply with `n` even as `k` and thus verify cost stay fixed).
+
+### 0.4 What §0 changes about this project's existing claims
+
+- **Req's naive-solver baseline is now doubly grounded**: previously
+  justified by profiling Req's own code; now independently confirmed to
+  structurally match the original 1ary-source reference implementation's
+  own memory layout (`vector<vector<Tuple>>`), not a strawman.
+- **The 144MB-vs-49MB reconciliation gap (`Req/SIZING.md` §5, `Req/PLAN.md`
+  A12) has a source now**: tromp's own README, stating both his 144MB and
+  xenoncat's 178MB directly, as real author-measured (200,9) figures. Worth
+  citing there instead of leaving the item as "not started."
+  `equi_miner.c`'s exact bucket-sizing arithmetic remains genuinely
+  unexercised, so the item isn't fully closed — but it is no longer an
+  unexplained number.
+- **The index-pointer/tree-backtracking design A6 needs to port now has a
+  primary-source specification**: xenoncat's own 5-page PDF, not just
+  tromp's later C implementation of the same idea — useful as a second,
+  independent description to check a ported implementation against.
+- **The `-p` personalization scope limit (assembly/CUDA excluded) is now
+  confirmed by two independent statements from tromp** — the commit message
+  (`191d3b583`, "for plain CPU miners") and the general README prose ("not
+  implemented in assembly and CUDA solvers") — not just one data point.
 
 ## 1. Repository facts
 
@@ -108,7 +323,7 @@ period, then two years of long-tail parameter/portability additions.
 
 ### Wave 6 — the Cantor-coding breakthrough (2016-11-16 to 2016-11-19)
 
-The wave `~/Work/ZK/ZKs/Equihash.md` §2 already identifies as the single most
+The wave `~/Work/ZK/ZKs/EquihashSurvey.md` §2 already identifies as the single most
 consequential optimization in the whole record — now dated to the day.
 
 | Date | sha | What |

@@ -48,7 +48,7 @@ the error is itself the lesson:
 
 1. **First pass** (session of 2026-07-12/13): built a "naive vs. index-pointer"
    table calibrating a linear model against a "~49 MB at (200,9)" figure
-   already sitting in `~/Work/ZK/ZKs/Equihash.md`. That 49 MB figure was
+   already sitting in `~/Work/ZK/ZKs/EquihashSurvey.md`. That 49 MB figure was
    itself never checked against the paper — it had been carried in this
    project's documents from an earlier session, ultimately traceable to the
    paper's own published Table 3, but nobody had opened the PDF to confirm.
@@ -146,37 +146,49 @@ against any execution of this project's own code.
 ## 2. The table
 
 k = 5, 7, 9; n swept from a trivial validation case to parameters whose
-naive peak memory reaches multi-TB. **Every row below is this project's own
+naive peak memory reaches multi-TB, filled out to cover every deployed or
+paper-cited (n,k) pair in this range (Zero Currency's (192,7)
+[Zero400/ZERO_COIN.md], Zcash's (200,9), Bitcoin Gold's (144,5)) alongside
+the even geometric spacing. **Every row below is this project's own
 extrapolation** via Proposition 4 (Equihash) / Proposition 6 (Requihash) at
-constant 1, computed fresh for this table (none of these exact (n,k) points
-duplicate the paper's own published Table 3 rows, which are listed
-separately just below for direct comparison). Both formulas were validated
-against **all seven** of the paper's own published Table 3 rows (not just
-one point) before use here — every prediction matched the published value
-to within ±0.04 in log2 bits, consistent with the paper's one-decimal
-rounding. Full validation arithmetic: `Req/SIZING.md` git history / this
-session's working notes.
+constant 1, computed fresh for this table. One row, (200,9), coincides
+exactly with a paper Table 3 point (§2b) and is included here anyway for a
+consistent sweep — this project's independently computed extrapolation at
+that point matches the published Table 3 value to within ±0.04 in log2
+bits (see §1), so the two are cross-checks of each other, not
+duplicates in provenance. Both formulas were validated against **all
+seven** of the paper's own published Table 3 rows (not just one point)
+before use here — every prediction matched the published value to within
+±0.04 in log2 bits, consistent with the paper's one-decimal rounding. Full
+validation arithmetic: `Req/SIZING.md` git history / this session's working
+notes.
 
 | k | n | ell | init list N | sol size (min/compact) | verify hashes (m=1) | naive peak mem (this repo's formula) | Equihash memory (extrapolated) | Requihash memory (extrapolated) |
 |---|---|---|---|---|---|---|---|---|
 | 5 | 24 | 4 | 2^5 | 20/16 B | 32 | 224 B | 96 B | 272 B |
 | 5 | 48 | 8 | 2^9 | 36/32 B | 32 | 5.0 KB | 3.0 KB | 7.5 KB |
 | 5 | 72 | 12 | 2^13 | 52/48 B | 32 | 104.0 KB | 72.0 KB | 172.0 KB |
+| 5 | 96 | 16 | 2^17 | 68/64 B | 32 | 2.0 MB | 1.5 MB | 3.5 MB |
+| 5 | 120 | 20 | 2^21 | 84/80 B | 32 | 38.0 MB | 30.0 MB | 69.0 MB |
+| 5 | 144 | 24 | 2^25 | 100/96 B | 32 | 704.0 MB | 576.0 MB | 1.3 GB |
 | 5 | 168 | 28 | 2^29 | 116/112 B | 32 | 12.5 GB | 10.5 GB | 23.8 GB |
 | 5 | 192 | 32 | 2^33 | 132/128 B | 32 | 224.0 GB | 192.0 GB | 432.0 GB |
 | 5 | 216 | 36 | 2^37 | 148/144 B | 32 | 3.9 TB | 3.4 TB | 7.6 TB |
 | 7 | 32 | 4 | 2^5 | 80/64 B | 128 | 256 B | 128 B | 600 B |
 | 7 | 96 | 12 | 2^13 | 208/192 B | 128 | 128.0 KB | 96.0 KB | 322.0 KB |
+| 7 | 128 | 16 | 2^17 | 272/256 B | 128 | 2.5 MB | 2.0 MB | 6.4 MB |
 | 7 | 168 | 21 | 2^22 | 352/336 B | 128 | 100.0 MB | 84.0 MB | 257.8 MB |
+| 7 | 192 | 24 | 2^25 | 400/384 B | 128 | 896.0 MB | 768.0 MB | 2.3 GB |
 | 7 | 232 | 29 | 2^30 | 480/464 B | 128 | 33.0 GB | 29.0 GB | 85.9 GB |
 | 7 | 264 | 33 | 2^34 | 544/528 B | 128 | 592.0 GB | 528.0 GB | 1.5 TB |
 | 7 | 296 | 37 | 2^38 | 608/592 B | 128 | 10.2 TB | 9.2 TB | 26.9 TB |
 | 9 | 40 | 4 | 2^5 | 320/256 B | 512 | 288 B | 160 B | 1.5 KB |
 | 9 | 120 | 12 | 2^13 | 832/768 B | 512 | 152.0 KB | 120.0 KB | 640.0 KB |
+| 9 | 160 | 16 | 2^17 | 1088/1024 B | 512 | 3.0 MB | 2.5 MB | 12.0 MB |
+| 9 | 200 | 20 | 2^21 | 1344/1280 B | 512 | 58.0 MB | 50.0 MB | 224.0 MB |
 | 9 | 240 | 24 | 2^25 | 1600/1536 B | 512 | 1.1 GB | 960.0 MB | 4.0 GB |
 | 9 | 280 | 28 | 2^29 | 1856/1792 B | 512 | 19.5 GB | 17.5 GB | 72.0 GB |
 | 9 | 320 | 32 | 2^33 | 2112/2048 B | 512 | 352.0 GB | 320.0 GB | 1.2 TB |
-| 9 | 360 | 36 | 2^37 | 2368/2304 B | 512 | 6.1 TB | 5.6 TB | 22.0 TB |
 
 ### 2b. The paper's own published Table 3, verbatim (page 31 of the PDF)
 
@@ -276,9 +288,16 @@ tromp's real measured ~144 MB at (200,9) (`equi_miner.c`'s own comment: a
 `SAVEMEM = 9/14` bucket-sizing tradeoff "with negligible discarding" applied
 on top of some unstated baseline) against the paper's 49 MB Table-3 figure
 for the same nominal parameters — these do not obviously agree either (144
-vs. 49 MB is a ~3× gap), and reconciling what tromp's real C implementation
-actually holds resident against the paper's asymptotic Proposition 4 bound
-remains open, tracked in PLAN.md. The earlier "144 ÷ 9/14 ≈ 224 MB" numeric
-observation from this document's prior revision is **retracted along with
-the 94 MB figure it was compared against** — it was coincidental arithmetic
-built on an error and should not be re-derived or over-read in any future pass.
+vs. 49 MB is a ~3× gap). **Partially narrowed** (SOLVERS.md §0.3, this
+session): tromp's own README states this 144MB figure directly as his real
+solver's measured (200,9) footprint, in the same breath as xenoncat's real
+178MB for the same parameters — both are genuine author-stated
+implementation numbers for different bucket-sort/pair-compression design
+choices, not a mysterious pair to reconcile against each other. What
+*remains* open is only reconciling either real number against the paper's
+49 MB **asymptotic** Proposition 4 bound — a different kind of gap (real
+implementation overhead vs. big-O estimate), tracked in PLAN.md A12. The
+earlier "144 ÷ 9/14 ≈ 224 MB" numeric observation from this document's
+prior revision is **retracted along with the 94 MB figure it was compared
+against** — it was coincidental arithmetic built on an error and should not
+be re-derived or over-read in any future pass.

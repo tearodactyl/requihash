@@ -11,7 +11,24 @@ status and requirements, the cross-track sequencing view; [BENCHMARK.md](BENCHMA
 — throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
 solution size and memory across parameters, naive vs. index-pointer; [TMTO.md](TMTO.md)
 — the time-memory tradeoff research plan; [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)
-— structural attack-surface review.
+— structural attack-surface review; [../Dirs.md](../Dirs.md) — how the
+surrounding directories (ZKs reference clones, Zebro, Zero400/ZeroPerf) relate
+to this work.
+
+## Origin and scope
+
+This effort started from Zebro's own PoW decision (D3, `~/Work/ZK/Zebro/CONSENSUS.md`
+§2.2): Zebro is a Rust rewrite migrating away from the Zcash/Zero C++ lineage,
+and needed a real evidence base before picking a parameterized PoW spine. That
+need drove an Equihash literature/implementation review
+([../Equihash.md](../Equihash.md), [../SOLVERS.md](../SOLVERS.md)), which
+surfaced both the regularity mis-specification the 2025 paper repairs
+(Requihash) and concrete portability/optimization gaps in existing solvers —
+this directory is the working implementation that resulted, feeding Zebro's
+M3 evidence package back. It is a research and reference-implementation
+effort, not a production node: the actual Zero Currency production chain
+(release candidate 4.0.1, incremental C++, stock Equihash, not Rust/Zebra-code-compatible)
+lives in `Zero400`/`ZeroPerf`, tracked separately — see [../Dirs.md](../Dirs.md).
 
 This directory delivers two independent implementations that share a byte-exact
 wire format so a solution mined by one verifies in the other:
