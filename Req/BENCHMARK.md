@@ -282,18 +282,35 @@ template once and cloning it per round recovered ~18–22% at m ≥ 2) — while
 blake2b's per-unit cost *drops* with m (iteration rounds absorb one short
 block, no input/nonce prefix); (3) the full (144,5) initial list generates in
 seconds, not minutes — production-parameter generation benching is routine.
-**The implementation-matched verdict (ARM).** The `blake2b_simd` rerun
-(batched `hash_many` generation, byte-equivalence-gated against the scalar
-construction) retires the maturity caveat *on this architecture* — and mostly
-confirms the gap: `blake2b_simd` gains only ~10% over the bundled scalar,
-because the crate's vector paths are x86-only and ARM gets its portable
-implementation. Against the best available blake2b, blake3 keeps 1.33–1.62×
-at m=1 and ~1.2–1.3× under iteration (the pre-stated R ≤ 0.8 gate is met
-everywhere except (96,5) m=4 at R = 0.83, marginal). The durable ARM finding,
-consistent with the ZeroPerf libsodium story: the BLAKE2b ecosystem has no ARM
-SIMD investment anywhere, while blake3 ships NEON — on ARM the blake3
-advantage is real, not artifact. Still pending for the other architecture: an
-x86-64/AVX2 leg, where `blake2b_simd`'s 4-way path should narrow the gap.
+**The implementation-matched verdict (ARM), corrected 2026-07-13.** The
+`blake2b_simd` rerun (batched `hash_many` generation, byte-equivalence-gated
+against the scalar construction) retires the maturity caveat *on this
+architecture, for this crate* — `blake2b_simd` gains only ~10% over the
+bundled scalar here, because that crate's vector paths (`avx2.rs`, `sse41.rs`
+— confirmed by reading its source directly) are x86-only; on aarch64 it falls
+back to its `portable.rs`. Against the best available blake2b measured in
+this repo, blake3 keeps 1.33–1.62× at m=1 and ~1.2–1.3× under iteration (the
+pre-stated R ≤ 0.8 gate is met everywhere except (96,5) m=4 at R = 0.83,
+marginal). **Also silently true and unremarked until now: the blake3 numbers
+in this table are already NEON-accelerated.** Confirmed directly
+(`blake3::platform::Platform::detect()` returns `NEON` on this machine) — the
+`blake3` crate's build script enables its NEON C intrinsics automatically on
+any aarch64 target (no feature flag; `is_aarch64() && is_little_endian()`),
+so every blake3 row in this document has been running NEON since the family
+campaign began, without any code in this repo naming it. **Correction to a
+prior claim in this section:** it is *not* true that "the BLAKE2b ecosystem
+has no ARM SIMD investment anywhere" — the official reference repo
+(`BLAKE2/BLAKE2`) ships a maintained `neon/` directory (`blake2b-neon.c`,
+added 2018, correctness-patched as recently as 2023 by one of the original
+BLAKE2 authors) with a dedicated aarch64 makefile; ZeroPerf's `Perf.md` §9.2
+independently found and fully scoped integrating exactly this code for the
+C++/libsodium path. What is true, and is the real asymmetry: no *published
+Rust crate* wraps that NEON code the way `blake3` wraps its own — the gap is
+in packaging and crate maintenance, not in whether BLAKE2b NEON code exists.
+Vendoring `BLAKE2/BLAKE2`'s `neon/` directly into a fourth `HashKind` here
+would be the apples-to-apples fix, not yet done (tracked in PLAN.md). Still
+pending, unrelated to the above: an x86-64/AVX2 leg, where `blake2b_simd`'s
+4-way path should narrow the gap (deprioritized, PLAN.md A7).
 
 **Substitution attribution at (96,5), m=1:**
 

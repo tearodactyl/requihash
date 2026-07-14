@@ -9,6 +9,10 @@ name = "requihash"
 path = "src/lib.rs"
 
 [[bin]]
+name = "req_memcheck"
+path = "src/bin/req_memcheck.rs"
+
+[[bin]]
 name = "req_xcheck"
 path = "src/bin/req_xcheck.rs"
 
