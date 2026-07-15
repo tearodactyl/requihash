@@ -1,15 +1,16 @@
 # SOLVER_CORPUS.md — comparative solver/verifier ports (RK, RZ, RT, CS)
 
 Purpose: build a body of solver and verifier implementations spanning the
-historical lineage (original authors → the pinned Rust verifier ecosystem
-→ tromp's optimized C solver → the paper's own Sequihash reference) to
-gain hands-on expertise with each design and to measure real hardware
-parameters (memory, timing) against implementations this project did not
-write, as a check on `Req/`'s own numbers. Each task below is scoped for
-standalone execution with no other context needed from this repository's
-other documents. Full commit-level provenance and history for the
-tromp/equihash lineage (RZ and RT's sources) is not repeated here — see
-`~/Work/ZK/Requihash/SOLVERS.md`, which already covers it in depth.
+historical lineage (original authors → tromp's optimized C solver, both
+before and after its 2024 single-core stripping → the paper's own
+Sequihash reference) to gain hands-on expertise with each design and to
+measure real hardware parameters (memory, timing) against implementations
+this project did not write, as a check on `Req/`'s own numbers. Each task
+below is scoped for standalone execution with no other context needed
+from this repository's other documents. Full commit-level provenance and
+history for the tromp/equihash lineage (RZ and RT's sources) is not
+repeated here — see `~/Work/ZK/Requihash/SOLVERS.md`, which already
+covers it in depth.
 
 **Cross-cutting requirements for all four tasks:**
 
@@ -42,24 +43,32 @@ tromp/equihash lineage (RZ and RT's sources) is not repeated here — see
   [reference implementation](https://github.com/khovratovich/equihash)
   (local clone `~/Work/ZK/ZKs/equihash-khovratovich`).
 - `tromp/equihash` — [repo](https://github.com/tromp/equihash) (local
-  clone `~/Work/ZK/ZKs/equihash-tromp`, full history); vendored pinned
-  snapshot inside the `equihash` crate,
+  clone `~/Work/ZK/ZKs/equihash-tromp`, full history) — **RT's source**:
+  `equi_miner.h`/`equi_miner.cpp`, the full multi-core original, genuine
+  `pthread_barrier_t` round synchronization intact. Distinct from the
+  vendored, pinned snapshot inside the `equihash` crate,
   `~/.cargo/registry/.../equihash-0.3.0/tromp/` (frozen at commit
-  `690fc5eff`, provenance in `~/Work/ZK/Requihash/SOLVERS.md`). RT's
-  source; RZ's source (the same crate's `verify.rs`/`minimal.rs`) is
-  Rust-native, not part of tromp's C code, despite sharing a crate.
+  `690fc5eff` and later single-core-stripped downstream, provenance in
+  `~/Work/ZK/Requihash/SOLVERS.md` §5) — **RZ's source**: that vendored
+  `equi_miner.c` plus its `tromp.rs` FFI wrapper, the exact single-core
+  path that reaches Zebra. Both RZ and RT port tromp's C solver algorithm
+  (not `verify.rs`/`minimal.rs`, which is a separate, independent, pure-
+  Rust verifier already covered by `Req/rust/src/verify/`'s own
+  cross-validated backends and not a port target for either).
 - `nicehash/nheqminer`, `cpu_tromp/` — [repo](https://github.com/nicehash/nheqminer)
-  (local clone `~/Work/ZK/ZKs/nheqminer`), a second copy of tromp's
-  multi-threaded solver, useful as a cross-check that the full pthread
-  design in `~/Work/ZK/ZKs/equihash-tromp` is not a one-off. Referenced
-  only as context for RT's scope decision, not a port target for any
-  task in this document.
+  (local clone `~/Work/ZK/ZKs/nheqminer`), a second, independent copy of
+  tromp's multi-threaded solver, useful as a cross-check that RT's
+  pthread design in `~/Work/ZK/ZKs/equihash-tromp` is not a one-off — not
+  a second port target, just corroboration.
 - `ZcashFoundation/zebra`, `zebra-chain/src/work/equihash.rs` — local
-  clone `~/Work/ZK/ZKs/zebra`. Explicitly **not** a port target for RZ or
-  any task here — confirmed by reading it that it only wraps the pinned
-  `equihash` crate, with no independent algorithm of its own. Referenced
-  so RZ's "why not Zebra" reasoning can be checked directly rather than
-  taken on faith.
+  clone `~/Work/ZK/ZKs/zebra`. Not a port target for any task here —
+  confirmed by reading it that it only wraps the pinned `equihash` crate
+  (`Solution::check`/`Solution::solve` delegate directly to
+  `is_valid_solution`/`tromp::solve_200_9`), with no independent algorithm
+  of its own. Referenced because RZ's target (the vendored `equi_miner.c`
+  reached via that same crate's `tromp.rs`) is, transitively, the actual
+  code Zebra's solve path runs — this reference lets that claim be
+  checked directly rather than taken on faith.
 - Tang, Sun, Gong, "On the Regularity of the Generalized Birthday Problem,"
   eprint 2025/1351 — [paper](https://eprint.iacr.org/2025/1351),
   [artifact repo](https://github.com/tl2cents/Generalized-Birthday-Problem)
@@ -196,109 +205,144 @@ separately-labeled test for it.
 
 ### Task
 
-Port the pinned `equihash` crate's Rust-native verifier — **not** Zebra's
-own `zebra-chain::work::equihash::Solution`, which is a thin wrapper
-around this same crate and contains no independent algorithm. Confirmed
-by reading both: `Solution::check` (`zebra-chain/src/work/equihash.rs`)
-and Zebra's `Solution::solve` both delegate directly to the pinned
-`equihash` crate (`is_valid_solution` and `tromp::solve_200_9`
-respectively) — there is nothing Zebra-specific to port. The real,
-independent, single-core Rust algorithm is the `equihash` crate's own
-`verify.rs`/`minimal.rs` (tree-fold verifier, `Node`/`from_children`
-collision checking), which is what RZ actually targets.
+Port the pinned `equihash` crate's **solver-side C code and its Rust FFI
+adjuncts** — `tromp/equi_miner.c` plus the `tromp.rs` wrapper that drives
+it — into Rust, included in a validation harness. This is the exact,
+single-core-stripped algorithmic path that reaches Zebra: Jack Grigg
+re-imported zcashd's frozen copy of tromp's solver into `librustzcash`
+on 2024-01-04 (`45652a21a`, converting it to compile as plain C), and
+teor removed its multi-threading a week later on 2024-01-11
+(`b737d0fe2`, "Remove unused thread support to enable Windows
+compilation") — full provenance in `~/Work/ZK/Requihash/SOLVERS.md` §5.
+Zebra's own `zebra-chain::work::equihash::Solution` is a thin wrapper
+around this crate and contains no independent algorithm of its own
+(confirmed by reading `Solution::check`/`Solution::solve` — they delegate
+directly to `is_valid_solution` and `tromp::solve_200_9`), so this
+vendored C, reached via the crate's `tromp.rs` FFI module, **is** "the
+actual algorithmic implementation in Zebra" for the solve path.
 
-This makes RZ a verifier port, distinct in kind from RK (solver) and RT
-(solver) — a natural complement to `Req/rust/src/verify/`, which already
-has three verifier backends (`reference`, `arena`, `early`) cross-
-validated against each other; RZ adds a fourth, external reference point
-from a completely independent codebase.
+Confirmed directly from source, not assumed: `tromp/equi_miner.c`'s own
+`worker()` function (line ~703) contains no `pthread_barrier_t` or any
+other synchronization primitive — it runs `equi_digit0` →
+`equi_digitodd`/`equi_digiteven` per round → `equi_digitK` for a single
+`tp->id` with no thread fan-out at all, and the crate's `tromp.rs` (its
+own `worker` function, distinct from the C one of the same name) calls
+`equi_digit0(eq, 0)` etc. directly with a hardcoded `id=0`, never
+spawning threads. This *is* genuinely single-core, not merely
+single-threaded-by-default — matching `SOLVERS.md` §7's file-inventory
+note ("multi-threading stripped 2024-01-11") exactly. Compare against
+RT, which targets the same algorithm family *before* that stripping, in
+tromp's own repo, with threading intact.
+
+The crate's `verify.rs`/`minimal.rs` (pure Rust tree-fold verifier, no
+tromp C code at all — confirmed by grep, zero references to `tromp`/
+`extern`/`unsafe` in either file) are a *separate*, independent algorithm
+already covered by `Req/rust/src/verify/`'s own three cross-validated
+backends; RZ is not a verifier port and does not target those files.
 
 #### Parameters
 
-Fully parametric at runtime — `is_valid_solution(n, k, input, nonce,
-solution)` takes `n`/`k` as plain arguments (`params.rs`'s own
-`Params::new`, constraints `n%8==0`, `k>=3`, `k<n`, `n%(k+1)==0`). No
-compile-time restriction of any kind, unlike RT's solver target. Reaching
-`k=7`/`k=9` (Zero/Zcash values) needs no port work — only vector points at
-those parameters, same situation as RK.
+Not parametrically general — inherits `equi_miner.c`'s own compile-time
+specialization via `#if`/`#elif`/`#error` branches (see RT §Parameters
+for the exact mechanism, shared between the two files since `equi_miner.c`
+is the frozen-and-stripped descendant of `equi_miner.h`). Confirm the
+vendored file's exact supported `(WN, RESTBITS)` set directly — expect it
+to be a subset of RT's, since stripping happened after the freeze and may
+have narrowed build configurations further; do not assume it is identical
+without checking.
 
 #### Validation
 
-Vectors, generated from the crate itself (it is already a pinned Rust
-dependency — no build step beyond `cargo`, no FFI, no subprocess). Use
-the crate's own `is_valid_solution` directly as the oracle: feed it known
-solutions (the official KAT set already pulled into this project at
-`Req/vectors/zcash_kat_*.json` per `Req/PLAN.md` A14 is directly usable
-here without re-generating anything — those vectors are exactly this
-crate's own official test data) and known-invalid solutions
-(`Req/vectors/zcash_kat_invalid.json`, same source).
+Both a live cross-check binary and vectors. The vendored C is buildable
+directly from the crate's own `tromp/` directory (`equi_miner.c` + `equi.h`
++ `blake2b.h` + `portable_endian.h`, no external repo dependency) — build
+it once via a thin CMake/`cc` wrapper, generate a KAT vector set the same
+way `Req/PLAN.md` A14 did, and additionally keep the option to invoke the
+built binary directly for differential fuzzing beyond the fixed vectors.
+The existing `Req/vectors/zcash_kat_*.json` files are verifier-oracle
+vectors (RZ can reuse them for validating that RZ's *own* port of
+`is_valid_solution`-equivalent logic isn't accidentally required — it
+isn't; RZ is solve-only) but are not solver KATs and do not substitute
+for freshly generated solve-side vectors here.
 
-Byte-exact target: the accept/reject decision and, where the invalid
-vectors specify one, the specific error kind (`Kind::Collision`,
-`Kind::OutOfOrder`, `Kind::DuplicateIdxs` per the crate's own `Kind` enum
-in `verify.rs`) — not a wire encoding, since this is a verifier, not a
-solver; there is no output to encode beyond the pass/fail result.
+Byte-exact target: the raw index set first; additionally the compressed-
+pair wire form if it can be extracted from the vendored C without
+modifying it (same caveat as RT step 4 — report as a blocker rather than
+patching the pinned source if it can't be exposed cleanly).
 
-**Exit criteria** (subsumed here): Rust port accepts every vector in
-`zcash_kat_96_5.json`/`zcash_kat_144_5.json`/`zcash_kat_200_9.json` and
-rejects every vector in `zcash_kat_invalid.json` with a matching error
-kind; the port's own README states explicitly that it targets the
-`equihash` crate's verifier, not Zebra's wrapper, and why (the wrapper has
-no independent algorithm).
+**Exit criteria**: Rust port produces byte-identical solutions to the
+vendored C binary at every `(WN, RESTBITS)` combination the vendored
+`equi_miner.c` actually supports (confirmed, not assumed, per
+`#if`/`#elif` branches found); the port's own README states explicitly
+that this is the single-core-stripped path that reaches Zebra via
+`librustzcash`'s `equihash` crate dependency, with the 2024-01-04 import
+/ 2024-01-11 stripping dates cited; included in a validation harness that
+can run alongside RT's for a direct single-core-vs-multi-core comparison
+on the shared pre-strip ancestor algorithm.
 
 ### Original
 
-`~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/src/verify.rs`
-(318 lines) and `src/minimal.rs` (265 lines) — resolve the `*` glob to
-the one matching directory on this machine.
+`~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/tromp/equi_miner.c`
+(737 lines) plus sibling `equi.h`, `blake2b.h`, `portable_endian.h` in the
+same directory, and `~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/src/tromp.rs`
+(the Rust FFI wrapper that calls into it) — resolve the `*` glob to the
+one matching directory on this machine.
 
 ### RZ Prompt
 
-> You are porting a Rust verifier to Rust — this is a re-implementation
-> exercise (independent code producing the same accept/reject decisions),
-> not a translation from another language. Do not import or wrap the
-> original crate; write independent code that reaches the same verdicts.
+> You are porting vendored C solver code, reached through its Rust FFI
+> wrapper, into native Rust. This is the exact code path Zebra's
+> dependency (`librustzcash`'s `equihash` crate) actually runs to solve —
+> not the crate's separate, independent Rust verifier (`verify.rs`/
+> `minimal.rs`), which is out of scope here.
 >
 > **Source**:
-> `~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/src/verify.rs`
-> and the same directory's `minimal.rs`. Read both in full before writing
-> anything. Do **not** read or port
-> `~/Work/ZK/ZKs/zebra/zebra-chain/src/work/equihash.rs` — confirm for
-> yourself first that it only wraps the crate above (check `Solution::check`
-> and `Solution::solve`'s bodies), then treat it as out of scope.
+> `~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/tromp/equi_miner.c`
+> (737 lines) and its sibling `equi.h` in the same directory, plus
+> `~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/src/tromp.rs`
+> (the FFI wrapper — read its `worker` function and note it calls
+> `equi_digit0(eq, 0)` etc. with a hardcoded `id=0`, never spawning
+> threads). Read all three before writing any Rust. Confirm for yourself
+> that `equi_miner.c`'s own `worker()` (around line 703) has no
+> `pthread_barrier_t`/synchronization of any kind — this is what makes it
+> genuinely single-core, not just single-threaded-by-default.
 >
 > **Target layout**: new directory
-> `~/Work/ZK/Requihash/SOLVER_CORPUS/rz/` — `src/lib.rs` (the
-> re-implemented verifier: tree-fold collision checking, distinct-index
-> and ordering checks; no I/O), `tests/` (uses existing vectors, generates
-> nothing new).
+> `~/Work/ZK/Requihash/SOLVER_CORPUS/rz/` — `src/lib.rs` (the ported
+> bucket/collision-round algorithm as a library, no I/O), `src/bin/
+> rz_gen.rs` (drives the vendored C via FFI or subprocess to build
+> vectors — state which choice you made), `tests/`, `vectors/`.
 >
 > **Steps, in order**:
-> 1. Read `verify.rs`'s `Node`/`from_children` tree-fold logic and
->    `minimal.rs`'s `expand_array`/`indices_from_minimal`. Identify the
->    four checks it performs (collision-per-round, ordering, distinctness,
->    zero-root — cross-check this list against what you actually find,
->    the crate's own `Kind` enum names the failure modes).
-> 2. Write an independent Rust implementation reaching the same
->    accept/reject decisions. You do not need to structure it the same
->    way as the original — use whatever module/function layout is
->    clearest; the requirement is matching verdicts, not matching code
->    shape.
-> 3. Point the test suite directly at this project's own existing vector
->    files: `~/Work/ZK/Requihash/Req/vectors/zcash_kat_96_5.json`,
->    `zcash_kat_144_5.json`, `zcash_kat_200_9.json` (must all be accepted)
->    and `zcash_kat_invalid.json` (must all be rejected, with the error
->    kind matching each vector's `expect_error_kind` field). Do not
->    regenerate these vectors — they already exist and are the crate's own
->    official KAT data.
+> 1. Find every `#if`/`#elif`/`#error` branch in `equi_miner.c`'s
+>    `getxhash0`/`getxhash1` and bucket-ID functions. List the exact
+>    `(WN, RESTBITS)` pairs that compile — do not assume this matches
+>    RT's list from `equi_miner.h`; the vendored file may support fewer.
+> 2. Port the algorithm to Rust, single-core (matching the source
+>    exactly — do not add threading here, that is RT's job on the
+>    pre-strip ancestor).
+> 3. Build the vendored C as a cross-check binary (thin `build.rs` or
+>    CMake wrapper compiling `equi_miner.c` directly — do not modify the
+>    vendored source).
+> 4. Generate vectors at every `(WN, RESTBITS)` pair from step 1: for
+>    each, run the C binary at 3 distinct nonces, capture the index set
+>    and, if exposable without modifying the C, the compressed-pair
+>    intermediate encoding.
+> 5. Write `tests/cross_check.rs`: assert the Rust port's output matches
+>    the C binary's output at every vectored point.
 >
-> **Stop and report if**: any valid vector is rejected, or any invalid
-> vector is accepted, or an invalid vector's actual error kind doesn't
-> match its `expect_error_kind` field.
+> **Stop and report if**: the `#if` branches found in step 1 leave the
+> vendored file supporting a materially different `(WN, RESTBITS)` set
+> than RT's `equi_miner.h` findings (report both lists, don't force them
+> to match); extracting the compressed-pair encoding requires modifying
+> the vendored C source (report as a blocker, don't modify it).
 >
-> **Done means**: `cargo test` passes in `rz/` against all four existing
-> vector files with zero new vectors generated, `README.md` states this
-> targets the `equihash` crate's verifier (not Zebra's wrapper) and why.
+> **Done means**: `cargo test` passes in `rz/` for every `(WN, RESTBITS)`
+> pair found in step 1; `README.md` states this targets the vendored,
+> single-core-stripped solver path that reaches Zebra (with the
+> 2024-01-04/2024-01-11 dates and commit hashes cited), not the crate's
+> separate verifier; the report states whether the compressed-pair
+> encoding was validated or only the index set was.
 
 ---
 
@@ -306,72 +350,61 @@ the one matching directory on this machine.
 
 ### Task
 
-Port tromp's C index-pointer algorithm into Rust. **Before writing any
-Rust**, resolve the scope question below — it changes the task
-substantially and should not be decided implicitly by which source file
-happens to be open.
+Port tromp's **full, multi-core original** — `equi_miner.h` and its
+adjuncts, from tromp's own repository, *before* the 2024-01-11 stripping
+that produced the vendored snapshot RZ targets — into Rust, preserving
+genuine multi-core execution in some idiomatic Rust approximation (a
+`std::sync::Barrier`-based per-round handoff mirroring the original's
+`pthread_barrier_t` design, or a `rayon`/scoped-thread redesign — either
+is acceptable as long as the round-synchronous structure survives and the
+choice is stated explicitly), and carry the result forward for further
+review, benchmarking, sizing, and optimization. xenoncat's own work
+(`~/Work/ZK/ZKs`, see `SOLVERS.md` §0.2-0.3) may be read for inspiration
+— tromp adopted xenoncat's BLAKE2b directly (`SOLVERS.md` Wave 3,
+`b86a43932`) and independently arrived at a related but distinct
+bucket/index-pointer design — but is **not** an RT implementation
+reference; RT ports tromp's actual code, not xenoncat's.
 
-#### The scope question: reduced vendored snapshot vs. full multi-core original
+Confirmed directly from source, not assumed: `equi_miner.h`'s `worker()`
+(around line 1107) genuinely fans out across a `pthread_barrier_t`
+(`eq->barry`, initialized in the `equi` constructor at line ~361 with
+`pthread_barrier_init(&barry, NULL, nthreads)`) with ten explicit
+`barrier(&eq->barry)` calls gating the per-round handoff between
+`equi_digit0`/`equi_digitodd`/`equi_digiteven`/`equi_digitK`. The driver
+`equi_miner.cpp` (`main`, reading `argc`/`argv`) takes a real `-t
+<nthreads>` flag, `calloc`s one `thread_ctx` per thread, and does genuine
+`pthread_create`/`pthread_join` fan-out (lines 92-122) — this is a real,
+deployed concurrency design, not a vestigial one. RT should preserve this
+property, not merely acknowledge it.
 
-Two real source targets exist, and picking between them (or sequencing
-both) is the actual first decision:
+Compare against RZ, which targets the same algorithm family *after*
+Grigg's 2024-01-04 librustzcash import and teor's 2024-01-11
+multi-threading removal — the exact single-core path that reaches Zebra.
+RT and RZ share a common pre-strip ancestor and are complementary: RT
+preserves what teor's commit removed, RZ ports what's actually shipped.
+Running both against the same `(WN, RESTBITS)` points is directly useful
+as a single-core-vs-multi-core comparison on what is otherwise the same
+bucket algorithm.
 
-1. **The reduced, vendored snapshot** — inside the `equihash` crate
-   (`~/.cargo/registry/.../equihash-0.3.0/tromp/equi_miner.c`, 737 lines).
-   Single-threaded (multi-threading was stripped downstream at some
-   point before vendoring; full history and exact commit in
-   `~/Work/ZK/Requihash/SOLVERS.md`, not repeated here). This exact
-   snapshot is what `Req/PLAN.md` A6/A18 already established as frozen at
-   commit `690fc5eff`, so a port of *this version* has direct provenance
-   value for A6's eventual production backend comparison.
-2. **The full, multi-core original** — `~/Work/ZK/ZKs/equihash-tromp/equi_miner.h`
-   (1160 lines) or `nheqminer`'s copy (`~/Work/ZK/ZKs/nheqminer/cpu_tromp/equi_miner.h`,
-   629 lines — a different, also-real variant, confirms the pthread design
-   isn't a one-off). Both use `pthread_barrier_t` for genuine multi-threaded
-   bucket-round synchronization (`equi_miner.h` line ~1107's `worker()`
-   function and the barrier-based round handoff) — the real, deployed
-   concurrency design, not present in the vendored snapshot at all.
-
-**Relative effort estimate, from reading both source trees directly (not
-guessed):**
-
-| | Reduced (single-threaded, vendored) | Full (multi-core, `equi_miner.h`) |
-|---|---|---|
-| Source size | 737 lines, one file | 1160 lines (or 629 in nheqminer's variant), same file family but with `pthread_barrier_t`, `thread_ctx`, and the `worker()` dispatch loop added |
-| Port effort | Lower — direct translation of a single sequential control flow (`equi_digit0` → `equi_digitodd`/`equi_digiteven` per round → `equi_digitK`) into Rust, no concurrency primitives to translate | Meaningfully higher — the barrier-synchronized round handoff has no direct Rust equivalent to transliterate; a faithful port needs either a Rust barrier primitive (`std::sync::Barrier`) mapped onto the same per-round handoff, or a redesign onto `rayon`/scoped threads, which is a genuine concurrency-design decision, not a mechanical translation |
-| Validation effort | Lower — single-threaded output is deterministic per nonce, trivially compared to a reference run | Higher — multi-threaded output must still be validated as deterministic (same solution set regardless of thread count/scheduling), which is an extra property to test beyond simple equality, and flaky-test risk if the port's synchronization has a bug |
-| Provenance value for A6 | Direct — this is the exact frozen snapshot A6's production backend will be compared against | Indirect — the concurrency layer is orthogonal to A6's own `all_solvers()`/`solve::pointer` scope (concurrency is a separate, later step per `Req/ARCHITECTURE.md` §7's own staged plan, item 3, "bucket-addressing... only if profiling justifies it") |
-
-**Recommendation: start with the reduced, single-threaded vendored
-snapshot only. Treat the full multi-core port as a distinct, later,
-separately-scoped task — do not attempt both in one pass.** The
-indecision named in this document's own prior framing ("tempted to ask
-for implementing both") is resolved by noting that the two targets answer
-different questions: the reduced snapshot directly serves A6's near-term
-provenance need with the lower-effort, lower-risk port; the full
-multi-core version is a genuine concurrency-design exercise whose value
-depends on a not-yet-decided future application (a real parallel
-production backend, which `Req/PLAN.md` A9's Q1 concurrency audit is
-already separately investigating for `Req/`'s own bucket solver, without
-reference to tromp's specific barrier design). Sequencing the multi-core
-port as an explicit follow-on, once the reduced port's validation
-approach is proven and *if* a concrete need for tromp's specific
-threading design (rather than a Rust-native concurrency design) emerges,
-avoids committing effort to a concurrency port before knowing whether its
-specific design is even the one worth matching.
-
-Keep the ported algorithm (the bucket/collision-round logic) in its own
-module with no CLI/console dependency, same as RK.
+Keep the ported algorithm (the bucket/collision-round logic, plus its
+concurrency structure) in its own module with no CLI/console dependency,
+same as RK — the `-t`/`-h`/`-n`/`-r`/`-s`/`-x`/`-c` argument parsing in
+`equi_miner.cpp`'s `main` is harness code, not algorithm, and stays out of
+the ported library.
 
 #### Parameters
 
 Tromp's C solver is **not parametrically general** — it is specialized
 per `(WN, BUCKBITS, RESTBITS)` combination via compile-time
 `#if`/`#elif`/`#error` branches in `getxhash0`/`getxhash1` and the two
-bucket-ID computation functions. The vendored `equi_miner.c` only
-implements: `WN=200` with `RESTBITS ∈ {4,8,9}`, `WN=144` with
-`RESTBITS=4`, and `WN=96` with `RESTBITS=4` — anything else fails at
-**compile time**, not runtime. This is fundamentally different from RK's
+bucket-ID computation functions. Confirm the exact `(WN, RESTBITS)` set
+`equi_miner.h` supports directly from source — do not assume it matches
+the vendored `equi_miner.c`'s set (RZ's target); the two files diverged
+after the freeze (`SOLVERS.md` §6: "112 commits ahead, 0 behind" — Cantor
+bucket coding and other post-freeze changes landed in tromp's repo and
+were never pulled into the vendored copy), so `equi_miner.h` may support
+additional `RESTBITS` values or a different bucket-addressing scheme the
+vendored snapshot lacks. This is fundamentally different from RK's
 original, which is parameter-generic at runtime.
 
 The Rust port must pick one of two options explicitly, not blur them:
@@ -380,27 +413,33 @@ generics or a macro expanding the same fixed `(n, restbits)` set) —
 faithful to the original's actual design, equally limited; or
 (b) **generalize the bit-extraction logic** to work for arbitrary `(n,
 restbits)` — a genuine *improvement*, and must be labeled as an
-improvement, not presented as "the same algorithm," if done. Given the
-recommendation above (reduced snapshot first), option (a) is the lower-
-risk starting choice — it validates the port against a known-fixed
-parameter set before any generalization risk is introduced; (b) can be a
-follow-on once (a) is proven, at which point it also naturally reaches
-`k=7`/`k=9` (Zero/Zcash values) if the generalized bit-extraction is
-correct for those `RESTBITS`.
+improvement, not presented as "the same algorithm," if done. Option (a)
+is the lower-risk starting choice — it validates the port against a
+known-fixed parameter set before any generalization risk is introduced;
+(b) can be a follow-on once (a) is proven, at which point it also
+naturally reaches `k=7`/`k=9` (Zero/Zcash values) if the generalized
+bit-extraction is correct for those `RESTBITS`.
 
 #### Validation
 
 Running the original source directly is viable and preferred over
-vectors alone — the vendored crate is a stable, versioned dependency
-(`equihash-0.3.0`), not a shallow clone with drift risk, and this project
-already has a working precedent for pulling KATs from this exact crate
-(`Req/PLAN.md` A14). Build the pinned C via the crate's own build script
-(or a thin CMake wrapper) as a cross-check binary, generate vectors from
-it the same way A14 did, kept in their own directory separate from the
-port's algorithm module — *and* keep the option to invoke the C binary
-directly for a larger differential fuzz pass (many random nonces) beyond
-what a fixed vector set covers: vectors for regression, live execution
-for one-time deep validation.
+vectors alone — tromp's repo is a stable local clone
+(`~/Work/ZK/ZKs/equihash-tromp/`), buildable via its own `Makefile`. Build
+`equi_miner.cpp` (which includes `equi_miner.h`) as a cross-check binary
+at multiple `-t <nthreads>` values, generate vectors the same way A14
+did, kept in their own directory separate from the port's algorithm
+module — *and* keep the option to invoke the C binary directly for a
+larger differential fuzz pass (many random nonces, multiple thread
+counts) beyond what a fixed vector set covers.
+
+Multi-threaded output must additionally be validated as **deterministic**
+regardless of thread count — run the reference binary at `-t 1`, `-t 2`,
+and `-t 4` (or however many the test machine's core count allows) on the
+same input/nonce and confirm identical solution sets before treating any
+single run as ground truth; the Rust port must pass the same
+thread-count-invariance check, not just single-run equality against one
+reference invocation. This is an extra property beyond RZ's validation,
+which has no thread-count axis to vary.
 
 Byte-exact target: the compressed-pair wire encoding, not just the index
 set. Tromp's triangular-number packing (`x = b(b-1)/2 + s`, mirrored in
@@ -410,76 +449,102 @@ more directly useful of the two ports for A6, not just an
 expertise-building exercise. State this dependency explicitly in RT's own
 docs.
 
-**Exit criteria** (subsumed here): Rust port produces byte-identical
-solutions to the pinned C source at every `(WN, RESTBITS)` combination
-the reduced snapshot supports; the compile-time-specialization-vs-
-generalization choice is stated explicitly, not left ambiguous; the
-compressed-pair encoding is validated against the original's own
-encoding, not merely the index set; the full multi-core port is
-explicitly out of scope for this pass and recorded as a separate future
-task, not attempted partially.
+**Exit criteria**: Rust port produces byte-identical solutions to the
+`equi_miner.h` reference at every `(WN, RESTBITS)` combination it
+supports (confirmed, not assumed, per `#if`/`#elif` branches actually
+found); the compile-time-specialization-vs-generalization choice is
+stated explicitly, not left ambiguous; the compressed-pair encoding is
+validated against the original's own encoding, not merely the index set;
+the port's concurrency structure is genuine (produces identical solutions
+across at least two different thread counts, not merely compiling with a
+`-t` flag that is silently ignored); the Rust threading approach chosen
+(`std::sync::Barrier` vs. `rayon`/scoped threads vs. other) is stated
+explicitly with reasoning; xenoncat's design is cited only as background
+context, never as a source ported from.
 
 ### Original
 
-Reduced (start here): the vendored, pinned copy inside the `equihash`
-crate, `~/.cargo/registry/.../equihash-0.3.0/tromp/equi_miner.c`. Full
-multi-core (separate future task): `~/Work/ZK/ZKs/equihash-tromp/equi_miner.h`
-or `~/Work/ZK/ZKs/nheqminer/cpu_tromp/equi_miner.h`.
+`~/Work/ZK/ZKs/equihash-tromp/equi_miner.h` (1160 lines) plus
+`equi_miner.cpp` (146 lines, the CLI driver with real `pthread_create`
+fan-out), `equi.h`, and `osx_barrier.h` in the same directory. (A second,
+independent copy exists at
+`~/Work/ZK/ZKs/nheqminer/cpu_tromp/equi_miner.h`, 629 lines, useful only
+as a cross-check that the pthread design isn't a one-off in the primary
+source — not a second port target.) Explicitly **not** the reduced,
+single-core-stripped vendored snapshot inside the `equihash` crate — that
+is RZ's target, ported separately.
 
 ### RT Prompt
 
-> You are porting one specific C file to Rust. A second, larger source
-> exists (tromp's multi-threaded original) — do not touch it, do not
-> read it beyond confirming it exists. Scope is the reduced snapshot only.
+> You are porting tromp's full multi-core C solver to Rust, preserving
+> its genuine multi-threaded round-synchronization structure. A second,
+> smaller, single-core-stripped source exists (the vendored snapshot
+> inside the `equihash` crate, `.../equihash-0.3.0/tromp/equi_miner.c`)
+> — that is a *different* task (RZ), targeting the exact code path that
+> reaches Zebra after multi-threading was removed downstream in 2024. Do
+> not use it as your source here; you are porting the pre-strip, still-
+> threaded original.
 >
-> **Source**: `~/.cargo/registry/src/index.crates.io-*/equihash-0.3.0/tromp/equi_miner.c`
-> (737 lines, single file, single-threaded — resolve the `*` glob to the
-> one matching directory on this machine). Read it in full, plus its
-> sibling `equi.h` in the same directory, before writing any Rust.
->
-> **Target layout**: new directory
-> `~/Work/ZK/Requihash/SOLVER_CORPUS/rt/` — `src/lib.rs` (the ported
-> bucket/collision-round algorithm as a library, no I/O), `src/bin/
-> rt_gen.rs` (drives the C reference via FFI or a subprocess to build
-> vectors — your choice, state which), `tests/`, `vectors/`.
+> **Source**: `~/Work/ZK/ZKs/equihash-tromp/equi_miner.h` (1160 lines) and
+> `equi_miner.cpp` (146 lines, the CLI driver — read `main`'s
+> `pthread_create`/`pthread_join` fan-out at lines ~92-122 to see how
+> `-t <nthreads>` actually drives concurrency), plus sibling `equi.h` and
+> `osx_barrier.h`. Read all of them before writing any Rust. Locate
+> `worker()` (around line 1107) and its ten `barrier(&eq->barry)` calls —
+> this is the per-round handoff your Rust port must preserve in some form.
 >
 > **Steps, in order**:
 > 1. Find every `#if`/`#elif`/`#error` branch in `getxhash0`, `getxhash1`,
 >    and the two bucket-ID computation functions. List the exact
->    `(WN, RESTBITS)` pairs that compile (expected: `WN=200` with
->    `RESTBITS ∈ {4,8,9}`; `WN=144` with `RESTBITS=4`; `WN=96` with
->    `RESTBITS=4` — confirm this against the actual source, do not trust
->    this list blindly).
+>    `(WN, RESTBITS)` pairs that compile — confirm against the actual
+>    source, do not assume it matches the vendored `equi_miner.c`'s set
+>    (it may differ; the two diverged post-freeze per `SOLVERS.md` §6).
 > 2. Port the algorithm choosing **option (a)**: mirror the same
 >    compile-time specialization using Rust `const` generics or a macro
 >    over the same fixed `(WN, RESTBITS)` set found in step 1. Do not
->    generalize to arbitrary parameters — that is out of scope for this
->    pass. State this choice as the first line of `rt/README.md`.
-> 3. Build the pinned C source as a cross-check binary (a thin `build.rs`
->    or CMake wrapper compiling `equi_miner.c` directly — do not modify
->    the C source).
-> 4. Generate vectors at every `(WN, RESTBITS)` pair from step 1: for each,
->    run the C binary at 3 distinct nonces, capture the full solution
->    (index set) **and** the compressed-pair intermediate encoding
->    (`tree.bid_s0_s1`'s packed form, `x = b(b-1)/2 + s`) if the C source
->    exposes it directly — if it does not expose the intermediate
->    encoding without modifying the C, say so explicitly in the report
->    rather than modifying the pinned source to extract it.
-> 5. Write `tests/cross_check.rs`: assert the Rust port's output matches
->    the C binary's output at every vectored point, for both the index
->    set and (if captured) the compressed-pair encoding.
+>    generalize to arbitrary parameters in this pass. State this choice as
+>    the first line of `rt/README.md`.
+> 3. Port the concurrency structure: map `equi_miner.h`'s per-round
+>    `pthread_barrier_t` handoff onto a Rust equivalent
+>    (`std::sync::Barrier` across scoped threads is the most direct
+>    mapping; a `rayon`-based redesign is acceptable if you state
+>    explicitly that it's a redesign, not a transliteration). State which
+>    approach you chose and why in `rt/README.md`.
+> 4. Build `equi_miner.cpp`/`equi_miner.h` as a cross-check binary via the
+>    repo's own `Makefile` or a thin CMake wrapper — do not modify the C
+>    source.
+> 5. Generate vectors at every `(WN, RESTBITS)` pair from step 1: for
+>    each, run the C binary at 3 distinct nonces **and** at least two
+>    different `-t` thread counts, capture the full solution (index set)
+>    **and** the compressed-pair intermediate encoding (`tree.bid_s0_s1`'s
+>    packed form, `x = b(b-1)/2 + s`) if the C source exposes it directly
+>    — if it does not expose the intermediate encoding without modifying
+>    the C, say so explicitly in the report rather than modifying the
+>    source to extract it. Confirm the reference binary itself produces
+>    identical solution sets across the different thread counts before
+>    trusting any single run as ground truth.
+> 6. Write `tests/cross_check.rs`: assert the Rust port's output matches
+>    the C binary's output at every vectored point, for both the index set
+>    and (if captured) the compressed-pair encoding; assert the Rust
+>    port's own output is identical across at least two different
+>    internal thread/worker counts.
 >
-> **Stop and report if**: the `#if` branches found in step 1 don't match
-> the expected list above (report the actual list, don't force-fit);
-> extracting the compressed-pair encoding requires modifying the pinned
-> C source (report this as a blocker, don't modify the source to work
-> around it).
+> **Stop and report if**: the `#if` branches found in step 1 leave
+> `equi_miner.h` supporting a materially different `(WN, RESTBITS)` set
+> than what's found for the vendored `equi_miner.c` (report both lists,
+> don't force them to match); extracting the compressed-pair encoding
+> requires modifying the C source (report as a blocker, don't modify it
+> to work around it); the reference C binary itself produces different
+> solutions at different thread counts (report as a correctness issue in
+> the reference, don't silently pick one thread count as ground truth).
 >
 > **Done means**: `cargo test` passes in `rt/` for every `(WN, RESTBITS)`
-> pair found in step 1, `README.md` states the option-(a) choice and the
-> full-multi-core-port-is-a-separate-task note, and the report states
-> explicitly whether the compressed-pair encoding was validated or only
-> the index set was.
+> pair found in step 1, including a thread-count-invariance check;
+> `README.md` states the option-(a) choice and the concurrency-mapping
+> choice explicitly, and notes xenoncat's work was consulted only as
+> background (cite `SOLVERS.md` §0.2-0.3), not ported from; the report
+> states explicitly whether the compressed-pair encoding was validated or
+> only the index set was.
 
 ---
 

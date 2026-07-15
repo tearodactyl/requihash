@@ -1,3 +1,5 @@
 Req/rust/target/
 Req/cpp/build/
+Req/SOLVER_CORPUS/*/target/
+Req/SOLVER_CORPUS/*/build/
 prompt.txt

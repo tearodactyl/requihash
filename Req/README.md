@@ -15,9 +15,9 @@ solution size and memory across parameters, naive vs. index-pointer;
 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — structural attack-surface
 review, including the time-memory-tradeoff (TMTO) test plan (§8-8a);
 [SOLVER_CORPUS.md](SOLVER_CORPUS.md) — standalone historical solver/verifier
-ports (RK/Khovratovich solver, RZ/pinned-crate verifier, RT/tromp solver,
-CS/Sequihash) for expertise and cross-implementation measurement, separate
-from the pending Group A-C work;
+ports (RK/Khovratovich solver, RZ/tromp's pinned single-core-stripped
+solver, RT/tromp's full multi-core solver, CS/Sequihash) for expertise and
+cross-implementation measurement, separate from the pending Group A-C work;
 [../UNIHASH.md](../UNIHASH.md) — a proposed unifying parametrization across
 Equihash/Requihash/Sequihash (research, not adopted, kept separate from this
 spec so it doesn't pollute pending-implementation context);

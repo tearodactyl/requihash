@@ -12,6 +12,7 @@ Prerequisites: the proof-of-work and memory-hardness cluster of the [FableFronti
 6. [Findings](#6-findings)
 7. [Conclusions](#7-conclusions)
 8. [Further Directions](#8-further-directions)
+9. [References](#9-references)
 
 ## 1. Scope and Stakes
 
@@ -186,3 +187,131 @@ Directions that survive these findings but exceed this document's scope, per the
 *Business.* The Equihash ecosystem's security debt is quantified and the repair is priced: upgrade engineering, audit, and difficulty-transition management for the affected chains is a concrete, deadline-shaped consulting surface, with the alternative — status quo on a formally weakened puzzle securing billions — now documented in the open literature. Estimator-driven parameter audits generalize to every GBP-adjacent scheme, including incremental hashes in production systems (the iSHAKE-class exposure).
 
 *Social.* A collapsed memory barrier is a collapsed attack cost: chains that keep first-generation parameters are cheaper to 51%-attack than their holders believe, and the information asymmetry between the cryptanalytic literature and coinholder awareness is itself a harm vector. The dual-use lesson of F-A9 — optimization contests surface attack surfaces — belongs in the design playbook of any project that crowdsources performance work on security-critical components.
+
+## 9. References
+
+The defining papers and primary sites for Requihash's own construction,
+the Equihash/GBP lineage it repairs, and the hash primitives it builds
+on — listed and linked once here, **sorted most recent year first**.
+Other documents in this project cite these by **Author (Year)** and point
+back here rather than repeating title, venue, and link details inline.
+This is not an exhaustive bibliography — narrower or more tangential
+sources stay cited inline wherever they're actually used (e.g. this
+document's own §2 timeline table, `SOLVERS.md`'s commit-level provenance);
+this list is only the sources load-bearing enough to be cited from more
+than one place. Full unpacked (not just cited) treatment of each paper
+lives in `PAPERS.md`, not repeated here.
+
+Link preference: a stable URL (eprint/arXiv/RFC/vendor site) wherever one
+exists — every entry below has one. An exact local filename would be used
+as a fallback only where no such URL exists; none of the entries here need
+that fallback as of this writing.
+
+- **Tang, Ding, Sun, Gong (2025).** "Memory Optimizations of Wagner's
+  Algorithm with Applications to Equihash." eprint 2025/2141.
+  [Paper](https://eprint.iacr.org/2025/2141),
+  [artifact repo](https://github.com/tl2cents/Wagner-Algorithms).
+  List Item Reduction (LIR) techniques; concrete implementation numbers for
+  plain Equihash (144,5) at 700 MB-2.5 GB depending on time-penalty
+  tradeoff, explicitly attributed against Tromp's own solver as baseline.
+- **Blocki & Smearsoll (2025).** "Provably Memory-Hard Proofs of Work With
+  Memory-Easy Verification." eprint 2025/1456.
+  [Paper](https://eprint.iacr.org/2025/1456).
+  Formally rehabilitates Biryukov & Khovratovich's MTP framework (broken by
+  Dinur & Nadler below) when instantiated with a data-independent
+  memory-hard function.
+- **Tang, Sun, Gong (2025).** "On the Regularity of the Generalized
+  Birthday Problem." eprint 2025/1351.
+  [Paper](https://eprint.iacr.org/2025/1351),
+  [artifact repo](https://github.com/tl2cents/Generalized-Birthday-Problem).
+  **The paper this project's Requihash implementation is based on** — the
+  regular (k-list) vs. loose (single-list) GBP distinction, the parameter
+  validity bound, the regularity-repaired construction (the paper's own
+  name: Sequihash). Table 3 (page 31) is this project's primary source for
+  published Equihash/Sequihash memory, time, and solution-size figures
+  (`Req/SIZING.md`).
+- **Ducas, Engelberts, Loyer (2025).** "Wagner's Algorithm Provably Runs in
+  Subexponential Time for SIS∞." eprint 2025/575.
+  [Paper](https://eprint.iacr.org/2025/575).
+  Proves Wagner's algorithm solves SIS^∞ (underlying Dilithium's concrete
+  security) in subexponential time — does not threaten Dilithium in
+  practice at real parameters.
+- **Bai, Gao, Hu, Zhang (2019).** "Constructing an Adversary Solver for
+  Equihash." NDSS 2019.
+  [Paper](https://www.ndss-symposium.org/ndss-paper/constructing-an-adversary-solver-for-equihash/).
+  The off-chip, multi-chip ASIC design built on the index-pointer
+  optimization — Equihash's ASIC-resistance defeat, formalized as a
+  parameter-independent adversary solver.
+- **O'Connor, Aumasson, Neves, Wilcox-O'Hearn (2019).** "BLAKE3: one
+  function, fast everywhere."
+  [Spec repo](https://github.com/BLAKE3-team/BLAKE3-specs),
+  [implementation repo](https://github.com/BLAKE3-team/BLAKE3). The design
+  paper and official Rust/C implementations behind `hash=blake3`
+  (`Req/SPEC.md` §6); local clones `~/Work/ZK/ZKs/BLAKE3-specs`,
+  `~/Work/ZK/ZKs/BLAKE3`.
+- **Alcock & Ren (2017).** "A Note on the Security of Equihash." CCSW 2017
+  (ACM Cloud Computing Security Workshop).
+  [ACM listing](https://dl.acm.org/doi/10.1145/3140649.3140652).
+  First public flag that Equihash's security does not actually reduce to
+  Wagner's algorithm as claimed, and that no tradeoff-resistance bound is
+  proven for it — the crack the 2025 Requihash/Sequihash line above
+  eventually repairs formally.
+- **Dinur & Nadler (2017).** "Time-Memory Tradeoff Attacks on the MTP
+  Proof-of-Work Scheme." eprint 2017/497.
+  [Paper](https://eprint.iacr.org/2017/497).
+  The sub-linear computation-memory tradeoff break of MTP that motivates
+  Blocki & Smearsoll's data-independence requirement above.
+- **Biryukov & Khovratovich (2016).** "Equihash: Asymmetric Proof-of-Work
+  Based on the Generalized Birthday Problem." NDSS 2016; journal version
+  Ledger 2017. [NDSS paper](https://www.internetsociety.org/sites/default/files/blogs-media/equihash-asymmetric-proof-of-work-based-generalized-birthday-problem.pdf),
+  [eprint 2015/946](https://eprint.iacr.org/2015/946),
+  [Ledger journal version](https://ledger.pitt.edu/ojs/ledger/article/view/48),
+  [reference implementation](https://github.com/khovratovich/equihash).
+  **The paper this entire document's subject matter descends from.**
+  Defines Equihash: memory-hard PoW via a single-list variant of Wagner's
+  algorithm plus algorithm binding against amortization. Adopted by Zcash
+  at (200,9). RK (`Req/SOLVER_CORPUS.md`) ports this paper's own reference
+  solver.
+- **Aumasson, Neves, Wilcox-O'Hearn, Winnerlein (2013).** "BLAKE2: simpler,
+  smaller, fast as MD5."
+  [Paper](https://www.blake2.net/blake2.pdf), [site](https://blake2.net).
+  The design paper behind `hash=blake2b` (`Req/SPEC.md` §3). Distinct from
+  the IETF RFC 7693 (Saarinen & Aumasson, 2015,
+  [text](https://www.rfc-editor.org/rfc/rfc7693)) — that is the
+  standards-track document; this is the original design write-up. The
+  separately-maintained reference implementation package
+  ([github.com/BLAKE2/BLAKE2](https://github.com/BLAKE2/BLAKE2) — portable
+  C, x86-vectorized C, ARM NEON, POWER8 variants; local clone
+  `~/Work/ZK/ZKs/blake2-reference`) is the more commonly deployed reference
+  shape and differs from the RFC's own sample code in struct layout and
+  call signatures.
+- **Bernstein, Lange, Niederhagen, Peters, Schwabe (2011).** "FSBday:
+  Implementing Wagner's generalized birthday attack against the SHA-3
+  round-1 candidate FSB."
+  [Paper](https://cr.yp.to/papers.html#fsbday).
+  A real, executed implementation of Wagner's attack against an actual
+  SHA-3 candidate — a concrete "naive formula vs. real achievable
+  footprint" precedent outside the Equihash/Sequihash line.
+- **Bernstein (2007).** "Better price-performance ratios for generalized
+  birthday attacks."
+  [Paper](https://cr.yp.to/papers.html#genbday).
+  Improves the machine-size/time exponents on Wagner's original attack.
+- **Wagner (2002).** "A Generalized Birthday Problem." CRYPTO 2002.
+  [Author's listing](https://people.eecs.berkeley.edu/~daw/papers/genbday.html).
+  No local PDF located in this project's reference directories as of this
+  check (`Req/SIZING.md` §0a notes the same). **The foundational result
+  everything else in this list is downstream of** — the k-tree algorithm,
+  sub-birthday-bound solving of the k-list XOR problem. Equihash's
+  single-list construction (above) is explicitly presented by its authors
+  as based on this algorithm, which is the specific claim Tang, Sun, Gong
+  (2025, above) show is a mischaracterization.
+
+**Where these are used:** `Req/SPEC.md` — Biryukov & Khovratovich (2016);
+Aumasson et al. (2013); Tang, Sun, Gong (2025). `Req/SIZING.md` — Tang,
+Sun, Gong (2025) (primary source for Table 3); Tang, Ding, Sun, Gong
+(2025); Bernstein (2007); Bernstein et al. (2011); Wagner (2002).
+`Req/SOLVER_CORPUS.md` — Biryukov & Khovratovich (2016) (RK's source);
+Tang, Sun, Gong (2025). `PAPERS.md` — full unpacked coverage of all nine
+papers above. `SOLVERS.md` — Biryukov & Khovratovich (2016), xenoncat's
+own algorithm description PDF (a primary source, not a paper in this list
+— see `SOLVERS.md` §0.2), Alcock & Ren (2017), Bai et al. (2019).

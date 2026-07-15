@@ -21,22 +21,23 @@ emits a JSON-lines record (min/median/MAD over warm reps; warm-up by time
 budget so microbenches get scheduled and ramped before sampling). A baseline
 file holds several appended runs; comparison is against the per-key *median of
 run-minima* with the decision band max(MADs, 5% of baseline) — the floor was
-set empirically: same-code cross-process spread on an unpinned laptop reached
-~5-7%, far above within-run MAD, and best-of-N baselines proved wrong-shaped
+set empirically: same-code cross-process spread on an unpinned laptop reaches
+~5-7%, far above within-run MAD, and best-of-N baselines are wrong-shaped
 (typical runs sit above a best-ever floor, flagging phantom regressions).
 Resolution tiers that follow: within-process seam comparisons (backends
 interleaved in one run) resolve ~1%; cross-process baseline tracking resolves
 the band; any verdict at the band edge counts only if it reproduces on a second
 run. Single-rep records (the instrumented solve's phase splits) are never
 tracked — their ratios are the datum. Committed baselines live in
-`baselines/`, tagged per machine. **Collection hygiene, learned the hard
-way:** baselines recorded on a loaded machine are biased slow and later
-manifest as phantom across-the-board wins — collect them idle (no concurrent
-builds), let the machine cool between back-to-back heavy runs (a family run
-launched immediately after another produced a ~19% thermal outlier on the
-blake2b family while blake3 held stable), and treat a comparison where
-*unrelated* benches all move the same direction as a machine-state signal,
-not a result.
+`baselines/`, tagged per machine.
+
+**Collection hygiene:** baselines recorded on a loaded machine are biased
+slow and manifest as phantom across-the-board wins — collect them idle (no
+concurrent builds), let the machine cool between back-to-back heavy runs (a
+family run launched immediately after another produced a ~19% thermal
+outlier on the blake2b family while blake3 held stable), and treat a
+comparison where *unrelated* benches all move the same direction as a
+machine-state signal, not a result.
 
 ## 1. Headline numbers
 
@@ -230,12 +231,52 @@ the default verifier; the reference solver/verifier stay as the equivalence orac
 - aarch64 only; x86 AVX2 numbers would differ, especially the hash fraction
   (wider SIMD helps hashing but not the allocation-bound merge). The `simd`
   backend uses `blake2b_simd`, which ships AVX2 on x86 and portable on aarch64,
-  so the +16% batched-hash win is expected to be larger on x86.
+  so the +16% batched-hash win is expected to be larger on x86 — but *which*
+  x86 matters (§7a): not every Intel chip in the field actually has AVX-512,
+  and AVX2 itself is universal only from Haswell (2013) forward.
 - Small parameters. At production (200,9) the list is 2^21 and the allocation
   problem is strictly worse, so the arena win strengthens at scale.
 - gen% is measured with scalar BLAKE2b in both phases; swapping in the SIMD hash
   lowers gen% further, making the merge share (and thus radix/parallel-merge
   priority) even more dominant.
+
+### 7a. Intel generation-to-ISA map, for whenever an x86 leg is run
+
+Confirmed from Intel's own documentation and generation-specific coverage,
+not assumed — matters for §7's x86 caveat because "x86 has AVX-512" is not
+a safe blanket assumption on real deployed hardware:
+
+| Generation (Intel codename) | Year | SSE2/4.1/4.2 | AVX2 | AVX-512 |
+|---|---|---|---|---|
+| Pentium 4 onward | 2001+ | SSE2 yes | no | no |
+| Nehalem (1st Core i-series) | 2008 | SSE4.1/4.2 yes | no | no |
+| Haswell | 2013 | yes | **yes, first gen** | no |
+| Skylake (client) | 2015 | yes | yes | no (client); Skylake-X/-SP (server/HEDT) added AVX-512, 2017 |
+| Ice Lake (client + server) | 2019/2021 | yes | yes | **yes, both client and server** |
+| Alder Lake (12th gen) onward, client | 2021+ | yes | yes | **fused off entirely**, even on P-cores — Intel disabled it chip-wide because the E-cores can't execute it and mixed P/E scheduling with an E-core-incompatible instruction set was unworkable; some early boards allowed re-enabling via BIOS (disable E-cores), later steppings fused it off in silicon |
+| Sapphire Rapids / Emerald Rapids / Granite Rapids (server, P-core-only Xeon lines) | 2023-2024 | yes | yes | **yes** — server P-core Xeon lines kept it throughout |
+| Sierra Forest (server, E-core-only Xeon line) | 2024 | yes | yes | **no** — the E-core Xeon line skips AVX-512 entirely, relies on AVX10 instead (same underlying tension as Alder Lake's client E-cores, resolved by omission rather than a chip-wide fuse-off since this line has no P-cores to conflict with) |
+| Nova Lake (client, upcoming) | ~2026 | yes | yes | **returning, via AVX10.2** — the first consumer line planned to unify P-core and E-core execution at full 512-bit width, ending the Alder-Lake-era fuse-off |
+
+**Per-core support is the real complication, not just per-generation.**
+From Alder Lake (2021) through whatever ships before Nova Lake, a "modern
+Intel laptop" is not a single ISA target: it's a hybrid chip where the
+P-cores are AVX-512-*capable* silicon that Intel deliberately disabled at
+the chip level, specifically because the E-cores sharing the same package
+cannot execute AVX-512 at all and the OS scheduler has no reliable way to
+pin AVX-512-issuing threads to P-cores only. This is a scheduling/
+compatibility decision, not a silicon limitation on the P-cores
+themselves — relevant here because a `blake2b_simd`-style runtime
+`is_x86_feature_detected!` check will correctly report "no AVX-512" on
+these chips (the CPUID bit is fused off), so no code needs special-casing
+for it, but it explains *why* the AVX2 tier (client Skylake through
+current Alder-Lake-generation laptops) is the realistic universal x86
+SIMD floor to benchmark against for a consumer-hardware target — not
+AVX-512, even though some of that same silicon generation has AVX-512
+present and working on the *server* side (Sapphire/Emerald/Granite
+Rapids). AVX10.2 (Nova Lake onward) is the intended long-term fix —
+unifying P-core and E-core execution at the same vector width — but isn't
+shipping hardware yet as of this check.
 
 ## 8. Harness fitness for per-component iterative optimization (reviewed)
 
@@ -273,74 +314,44 @@ one thermal outlier discarded per the confirmation rule):**
 | (144,5) m=1 | 145–155 | 137.7 | 93.8 | 1.47× |
 | (200,9) m=1 | 155–164 | 146.3 | 110.0 | 1.33× |
 
-Three readings, one caveat. (1) blake3's m=1 advantage comes substantially
-from its *streamed* generation (one XOF stream per class — no per-leaf hasher
-setup); (2) iteration narrows it: m ≥ 2 falls back to per-leaf work and the
-advantage drops to ~1.3× — an earlier collapse to ~1.1× was self-inflicted
-(the derive_key context key was re-derived per leaf per round; deriving the
-template once and cloning it per round recovered ~18–22% at m ≥ 2) — while
-blake2b's per-unit cost *drops* with m (iteration rounds absorb one short
-block, no input/nonce prefix); (3) the full (144,5) initial list generates in
-seconds, not minutes — production-parameter generation benching is routine.
-**The implementation-matched verdict (ARM), corrected 2026-07-13.** The
-`blake2b_simd` rerun (batched `hash_many` generation, byte-equivalence-gated
-against the scalar construction) retires the maturity caveat *on this
-architecture, for this crate* — `blake2b_simd` gains only ~10% over the
-bundled scalar here, because that crate's vector paths (`avx2.rs`, `sse41.rs`
-— confirmed by reading its source directly) are x86-only; on aarch64 it falls
-back to its `portable.rs`. Against the best available blake2b measured in
-this repo, blake3 keeps 1.33–1.62× at m=1 and ~1.2–1.3× under iteration (the
-pre-stated R ≤ 0.8 gate is met everywhere except (96,5) m=4 at R = 0.83,
-marginal). **Also silently true and unremarked until now: the blake3 numbers
-in this table are already NEON-accelerated.** Confirmed directly
-(`blake3::platform::Platform::detect()` returns `NEON` on this machine) — the
-`blake3` crate's build script enables its NEON C intrinsics automatically on
-any aarch64 target (no feature flag; `is_aarch64() && is_little_endian()`),
-so every blake3 row in this document has been running NEON since the family
-campaign began, without any code in this repo naming it. **Correction to a
-prior claim in this section:** it is *not* true that "the BLAKE2b ecosystem
-has no ARM SIMD investment anywhere" — the official reference repo
-(`BLAKE2/BLAKE2`) ships a maintained `neon/` directory (`blake2b-neon.c`,
-added 2018, correctness-patched as recently as 2023 by one of the original
-BLAKE2 authors) with a dedicated aarch64 makefile; ZeroPerf's `Perf.md` §9.2
-independently found and fully scoped integrating exactly this code for the
-C++/libsodium path. What is true, and is the real asymmetry: no *published
-Rust crate* wraps that NEON code the way `blake3` wraps its own — the gap is
-in packaging and crate maintenance, not in whether BLAKE2b NEON code exists.
-Vendoring `BLAKE2/BLAKE2`'s `neon/` directly into a fourth `HashKind` here
-would be the apples-to-apples fix, not yet done (tracked in PLAN.md A13).
-The repo is now cloned locally (`~/Work/ZK/ZKs/blake2-reference`) for direct
-reference — this removes the "does this code even exist" uncertainty but
-does not shrink the remaining work, since "vendoring" here can't mean a
-plain FFI wrapper (no `build.rs` hook to attach one to, see below); the
-real task is a genuine translation to `core::arch::aarch64` intrinsics.
-Still pending, unrelated to the above: an x86-64/AVX2 leg, where
-`blake2b_simd`'s 4-way path should narrow the gap (deprioritized, PLAN.md A7).
+Three readings. (1) blake3's m=1 advantage comes substantially from its
+*streamed* generation (one XOF stream per class — no per-leaf hasher
+setup). (2) Iteration narrows it: m ≥ 2 falls back to per-leaf work and the
+advantage drops to ~1.3×, while blake2b's per-unit cost *drops* with m
+(iteration rounds absorb one short block, no input/nonce prefix) — the
+`blake3` path caches the `derive_key` context template once and clones it
+per round rather than re-deriving it per leaf, which is what keeps its
+iterated cost this low. (3) The full (144,5) initial list generates in
+seconds, not minutes — production-parameter generation benching is
+routine.
 
-**Can blake2b's NEON path be made "just as automatic" as blake3's? Checked
-directly, and the honest answer is no, not by copying blake3's mechanism —
-the two crates are architecturally different at the point that matters.**
-`blake3`'s automaticity comes from its `build.rs`: it shells out to a C
-compiler at build time and sets `cargo:rustc-cfg=blake3_neon` whenever
-`is_aarch64() && is_little_endian()`, with zero user action needed, because
-blake3 was designed from the start around a build-script-driven C/Rust FFI
-boundary for every SIMD backend (x86 assembly, AVX-512 intrinsics, and NEON
-C intrinsics all go through the same mechanism). `blake2b_simd` has **no
-`build.rs` at all** (confirmed: no such file in the crate) — its `avx2.rs`
-and `sse41.rs` backends are pure Rust, selected by a plain
-`#[cfg(target_arch = "x86"/"x86_64")]` gate plus a runtime CPUID check, no
-C compilation step anywhere in its pipeline. There is no existing hook to
-extend with a NEON branch; someone would have to (a) write a `neon.rs` in
-pure Rust using `core::arch::aarch64` intrinsics — translating, not simply
-vendoring, `BLAKE2/BLAKE2`'s C `blake2b-neon.c` — and (b) add the
-`#[cfg(target_arch = "aarch64")]` gate to select it, which *would* then be
-just as automatic as blake3's dispatch (no separate feature flag needed,
-same as blake3) — but the code to gate does not exist yet in any Rust crate
-found by this project. So: the *automaticity mechanism* (a `#[cfg]` gate,
-no user action) is trivially portable to blake2b once the NEON code exists
-in Rust; the *NEON code itself* is not portable without a genuine port from
-C intrinsics to `core::arch::aarch64` intrinsics, which is real, non-trivial
-work nobody has done publicly as far as this project has checked.
+**Implementation-matched verdict (ARM).** `blake2b_simd`'s batched
+`hash_many` generation (byte-equivalence-gated against the scalar
+construction) gains only ~10% over the bundled scalar backend here, because
+that crate's vector paths (`avx2.rs`, `sse41.rs`) are x86-only — on
+aarch64 it falls back to `portable.rs`. Against the best available blake2b
+measured in this repo, blake3 keeps 1.33–1.62× at m=1 and ~1.2–1.3× under
+iteration (the pre-stated R ≤ 0.8 gate is met everywhere except (96,5) m=4
+at R = 0.83, marginal).
+
+**The blake3 numbers above are NEON-accelerated**, confirmed directly
+(`blake3::platform::Platform::detect()` returns `NEON` on this machine):
+the `blake3` crate's build script enables its NEON C intrinsics
+automatically on any aarch64 target (`is_aarch64() && is_little_endian()`,
+no feature flag). BLAKE2b has a comparable NEON implementation too — the
+official `BLAKE2/BLAKE2` repo ships a maintained `neon/blake2b-neon.c` with
+a dedicated aarch64 makefile (local clone:
+`~/Work/ZK/ZKs/blake2-reference`) — but no published Rust crate wraps it
+the way `blake3` wraps its own; the gap is packaging, not the existence of
+BLAKE2b NEON code. `blake3`'s automaticity comes specifically from its
+`build.rs` shelling out to a C compiler at build time and setting
+`cargo:rustc-cfg=blake3_neon` with zero user action — `blake2b_simd` has no
+`build.rs` at all, so there's no equivalent hook to extend with a NEON
+branch; closing this gap needs a genuine Rust translation of
+`blake2b-neon.c`'s C intrinsics to `core::arch::aarch64`, not an FFI
+wrapper. Tracked in PLAN.md A13, which carries the full technical summary.
+A separate x86-64/AVX2 leg (where `blake2b_simd`'s 4-way path should narrow
+the gap) is deprioritized, PLAN.md A7.
 
 **Substitution attribution at (96,5), m=1:**
 
@@ -351,15 +362,15 @@ work nobody has done publicly as far as this project has checked.
 | blake3 | 9.46 ms | 63% | 32% | 5% |
 
 Both attributions are clean (marginals sum to ~100%, residual at or near
-noise). The first campaign's blake3 attribution was invalid — leaf-major stub
-variants against the class-major streamed real path violated code-shape
-identity, producing a negative assembly marginal and a 64% residual; the
-framework's own precondition caught it. Fixed by dispatching all three
-variants through one loop-shape implementation per backend
-(`gen_phase_variant`), so a stub can never walk a different loop than the
-path it stubs. The corrected picture: blake3 spends proportionally less on
-hashing (63% vs 79%) and more on assembly — expand/pack is the next shared
-optimization target, worth ~a fifth of either generator.
+noise) — a substitution attribution is only valid when the hash-stubbed and
+assembly-stubbed variants walk the *same loop shape* as the real path
+(`gen_phase_variant` dispatches all three variants through one loop-shape
+implementation per backend to guarantee this; a stub that takes a different
+code path than the real one it stands in for produces a negative marginal
+and a large residual — the signature of a broken attribution, not a real
+result). blake3 spends proportionally less on hashing (63% vs 79%) and more
+on assembly — expand/pack is the next shared optimization target, worth
+~a fifth of either generator.
 
 **Verify-shaped cost (2^k × m leaf recomputes + fold):**
 

@@ -22,6 +22,12 @@ consumes this spec and adds nothing to it.
   Generalized Birthday Problem," NDSS 2016 —
   [paper](https://www.internetsociety.org/sites/default/files/blogs-media/equihash-asymmetric-proof-of-work-based-generalized-birthday-problem.pdf),
   [reference implementation](https://github.com/khovratovich/equihash).
+- Aumasson, Neves, Wilcox-O'Hearn, Winnerlein, "BLAKE2: simpler, smaller,
+  fast as MD5," 2013-01-29 — [paper](https://www.blake2.net/blake2.pdf),
+  [site](https://blake2.net) — the hash primitive `hash=blake2b` (§3) is
+  built on; this spec's own digest-length and personalization conventions
+  are this project's choices layered on top, not asserted by the paper
+  itself.
 - Tang, Sun, Gong, "On the Regularity of the Generalized Birthday Problem,"
   eprint 2025/1351 — [paper](https://eprint.iacr.org/2025/1351) §5.2 (the
   regularity repair `keying=regular` implements), [artifact

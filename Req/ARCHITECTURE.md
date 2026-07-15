@@ -50,6 +50,72 @@ The verifier is deliberately *not* a seam. It stays single, scalar, portable, an
 auditable, because it is the consensus-critical path (HardwareBridge.md: "verification
 must stay boring"). A miner may be exotic; a verifier may not.
 
+## 1a. Not married to any specific backend, binding, or GBP parametrization
+
+Stated explicitly because it's easy to read the rest of this document — and
+`SOLVER_CORPUS.md`'s RZ/RT ports, which target Zcash/Zebra's own tromp-derived
+C and `blake2b_simd` specifically — as this project committing to those as
+*the* implementation. It is not. Both seams (§1) exist so this project can
+go to primary sources, evaluate real candidates on their own merits, and
+swap freely — not so it can standardize on Zcash/Zebra's current choices or
+on BLAKE2/BLAKE3 as a pair:
+
+- **Seam A is open past BLAKE2 and BLAKE3 entirely.** Zcash's `blake2b_simd`
+  binding (either generation — the raw-C-ABI shape the pinned `equihash`
+  crate/Zebra use, or zcashd's newer `cxx::bridge` one) and BLAKE3 are two
+  *candidates* this project has measured (BENCHMARK.md §9), not the
+  boundary of the search. If a different hash — a different BLAKE2/3
+  variant, a different SHA-3 family member, something else entirely —
+  proves better on the actual selection criterion below, it goes in Seam A
+  the same way blake2b/blake3 did, with no special status for either
+  Zcash's specific bindings or the Blake family's brand name.
+- **Seam B is open past tromp's Equihash solver, "neutered" or otherwise.**
+  RT explicitly targets tromp's *own* full multi-core original (not the
+  single-core-stripped Rust-wrapped copy Zebra actually runs, which is
+  RZ's separate target) precisely because this project wants the real,
+  best-available design as a candidate — not a Rust-convenience rewrap of
+  whatever a downstream consumer happened to freeze. Both RK (Khovratovich's
+  original) and RT (tromp's design) are being evaluated on their own terms
+  as solver candidates, not ported out of loyalty to being "the Equihash
+  lineage."
+- **The GBP parametrization itself is not fixed to Equihash or Sequihash
+  either.** `Req/SPEC.md`'s own opening frames its whole
+  `PoW(n, k, hash, m, keying, context)` family as "a design freedom of this
+  program... not asserted as canonical against the wider design space."
+  `UNIHASH.md` already treats the regularity binding's concrete encoding
+  (this project's `le32(class)||le32(counter)` vs. the paper's own
+  `f"{i}-{j}"` ASCII form) as one arbitrary choice among several compatible
+  ones — a precedent for treating `keying`, `encoding`, and eventually the
+  generalized-birthday structure itself as points in a wider space, not
+  fixed commitments to Equihash's or Sequihash's specific choices. A future
+  parametrization that resembles neither is explicitly in scope, not a
+  departure from this project's premise.
+- **The actual selection criterion, stated plainly**: a quality-proven,
+  stable implementation — real primary-source code with a track record,
+  not a paper's asymptotic claim alone — that supports acceleration on
+  *both* x86 and Apple-Silicon/ARM (the two platforms this project
+  actually builds and measures on), evaluated by running it, not by
+  reputation. C/C++ reference implementations wrapped by thin Rust
+  iterators/FFI are an accepted shape at either seam when that's what the
+  best-available source is written in (RZ's `blake2b_glue.c` trick and
+  RT's planned FFI-or-subprocess cross-check binary are both examples of
+  this pattern already in use) — the wrapper language is not itself a
+  selection criterion; implementation quality and cross-platform
+  acceleration support are.
+- **Version policy: no required pin.** This project has not established any
+  required pinned version for a dependency at either seam. Where a version
+  looks pinned in practice (e.g. `equihash = "0.3"`), that reflects
+  *upstream's* choice (Zebra's own `Cargo.toml`), not a constraint this
+  project has adopted — and in that specific case `0.3.0` is also simply
+  the only version of that crate published on crates.io, not a stale
+  pin. Default to latest stable, or the most widely-adopted recent version
+  where "stable" is ambiguous, for anything this project depends on
+  directly (`Req/rust/Cargo.toml` already does this via loose `"1"`
+  semver for `blake2b_simd`/`blake3`/`rayon`) — move off a version only
+  when a known incompatibility is the actual reason, stated as such, not
+  out of habit or unexamined deference to what an upstream consumer
+  happens to run.
+
 ## 2. Trait / interface at each seam
 
 Express each seam as a narrow interface the rest of the code programs against.

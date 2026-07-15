@@ -22,7 +22,9 @@ JS-binding modernization has no bearing on it.
 
 ## Contents
 
-0. The original implementation and xenoncat's derivative (Khovratovich, xenoncat)
+0. The original implementation and xenoncat's derivative (Khovratovich,
+   xenoncat; §0.5 covers GPU support specifically — tromp has real CUDA
+   kernels, xenoncat has none)
 1. Repository facts (tromp)
 2. Full commit history, annotated (2016-10-13 → 2018-08-07)
 3. What each wave of changes actually did
@@ -156,6 +158,20 @@ is precise enough to reconstruct the design without reading the assembly at
 all. This is worth citing directly rather than through tromp's secondhand
 description whenever this project references "the index-pointer technique."
 
+**Directory structure, for orientation** (`equihash-xenon/Linux/asm/` —
+the canonical source; nothing here is specific to one AVX width or one
+file): a thin top-level `equihash_avx1.asm`/`equihash_avx2.asm` per
+variant (15 lines each) is a FASM build unit only — `format elf64`,
+`public ... as 'EhSolverAVX1'` — that `include`s the files carrying the
+actual content: `proc_ehprepare_avx*.asm` (setup) and
+`proc_ehsolver_avx*.asm` (the Stage 1-9 loop described above) assembled
+into `.text`, `data_blake2b.asm` into `.data`. `macro_eh.asm` and
+`macro_blake2b_avx*.asm` hold shared macros both stages use. The
+`struct_eh.inc`/`params.inc` headers cited above live one level up in
+`Linux/asm/`, shared by both AVX widths. Reading the directory as a whole
+— not any single file — is what reconstructs the design; no individual
+file stands alone as "the" solver.
+
 ### 0.3 Tromp's own account of his relationship to xenoncat — a primary source, not inferred
 
 `equihash-tromp/README.md` (142 lines, ungrepped by prior SOLVERS.md research
@@ -234,6 +250,64 @@ memory scales steeply with `n` even as `k` and thus verify cost stay fixed).
   confirmed by two independent statements from tromp** — the commit message
   (`191d3b583`, "for plain CPU miners") and the general README prose ("not
   implemented in assembly and CUDA solvers") — not just one data point.
+
+### 0.5 GPU support: tromp has real CUDA code; xenoncat has none
+
+Checked directly against both source trees, not assumed from either
+author's general reputation:
+
+**Tromp: real, complete CUDA kernels**, `equi_miner.cu`/`dev_miner.cu`/
+`blake2b.cu` (local clone `~/Work/ZK/ZKs/equihash-tromp`, 35575 + 34919 +
+5450 lines respectively — confirmed present, not vendored into the
+`equihash` crate per §7's file inventory). Structure, read directly from
+`equi_miner.cu`:
+- One `__global__` kernel per Wagner round, most rounds individually
+  unrolled and named (`digitH`, `digit_1` through `digit8`, generic
+  `digitO`/`digitE` for odd/even rounds beyond the unrolled set, `digitK`
+  for the final round) — the same bucket/collision algorithm as the CPU
+  `equi_miner.c`/`.h`, just each round dispatched as its own kernel launch
+  rather than a function call.
+- Standard `blockIdx.x * blockDim.x + threadIdx.x` thread indexing; the
+  driver (`dev_miner.cu`) launches each kernel as `digitN<<<nthreads/tpb,
+  tpb>>>(device_eq)`, i.e. one thread per leaf/slot being processed that
+  round, `tpb` (threads-per-block) and total thread count configurable at
+  the driver level.
+- `cudaMalloc`/`cudaMemcpy` move the `equi` state structure to device
+  memory once per attempt; results copy back host-side after `digitK`.
+- Build target: `nvcc -arch sm_35` (confirmed in the repo's own
+  `Makefile`) — CUDA **compute capability 3.5**, the Kepler generation
+  (GTX 600/700-series-class GPUs, ~2012-2014). No later compute-capability
+  target (Maxwell/Pascal/newer) appears in the Makefile; the code may well
+  run on newer hardware (CUDA is generally forward-compatible), but it was
+  never rebuilt or retargeted to a newer `-arch` flag in this repo's
+  history as far as this check found.
+- Real, author-stated throughput already on file in this document (§0.3
+  above): tromp's own README gives `eqcuda` at **27.2 Sol/s** on a GTX 980
+  at (200,9) — faster than his 8-thread CPU figure (22.2 Sol/s) on the
+  same era of hardware (4GHz i7-4790K), but not the order-of-magnitude gap
+  GPU mining shows on less memory-bound workloads; consistent with
+  Equihash's design intent (memory-bandwidth-bound merge, not
+  compute-bound), which caps the GPU's structural advantage.
+- Parameter generalization: `52b71897e` (2017-08-08) "generalize eqcuda
+  <n,k> parameters"; `8d85a6cdb`/`e36ff0521`/`17b76cb3e` (2018-06-09) "add
+  192,7 cuda support" — confirming the CUDA path was actively maintained
+  and extended to cover Zero Currency's (192,7), not left to bitrot after
+  initial (200,9)-only development.
+
+**Xenoncat: no GPU code published**, checked two ways. (1) The repo itself
+(`~/Work/ZK/ZKs/equihash-xenon`) contains no `.cu`/CUDA/OpenCL files of
+any kind — confirmed by directory search, not absence-of-evidence. (2) The
+author's own 5-page algorithm-description PDF (§0.2's primary source,
+`notes/algorithm description.pdf`) describes multithreading explicitly
+(§5, "Partitions" — CPU thread ID selects which partition a pair writes
+into) but never mentions GPU, CUDA, or OpenCL across any of its five
+pages, read in full for this check. Xenoncat's own confirmed SIMD
+investment (per §0.2) is AVX2 assembly for BLAKE2b, adopted by tromp in
+Wave 3 — a CPU-vector optimization, not a GPU one. **The two authors'
+acceleration work is genuinely disjoint**: tromp alone has GPU kernels;
+xenoncat alone (as far as documented) pushed CPU SIMD assembly further —
+consistent with tromp's own README crediting xenoncat's BLAKE2b
+specifically, never anything GPU-related.
 
 ## 1. Repository facts
 
