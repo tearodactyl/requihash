@@ -224,3 +224,50 @@ difficulty logic is written once and every acceleration tier — present and fut
 CPU SIMD through the inference-hardware MAC arrays of HardwareBridge.md F-X1 —
 plugs into the two named seams behind a self-test gate.
 ```
+
+## 7. Solve-seam backends: which 2016-17 technique each one implements
+
+The 2016-17 Equihash optimization wave produced four representational
+techniques (index-pointer storage, incomplete bucket sort, static allocation,
+in-place merge) that took the reference solver from the paper's naive form to
+the memory floor — their origin, authorship, and the 178MB/144MB/49MB record
+are covered in full in [`../SOLVERS.md`](../SOLVERS.md) §0, not repeated here.
+This section is the concrete record of which of Req's own Seam-B backends
+implements which technique, and what it measured.
+
+In Equihash, techniques 1-2 are what collapsed ASIC resistance (they fix the
+memory-access pattern an ASIC wants). In **Requihash they are safe to use**,
+because the regularity constraint blocks the single-list algorithm those
+techniques accelerate — the k-list solver they run on costs an ASIC ≥2x memory
+rather than less (`../Requihash.md` F-A4). So Req adopts the performance wins
+without reopening the vulnerability.
+
+| Technique | Prior state | Applied? |
+|---|---|---|
+| 2. Incomplete bucket sort | full `sort_by` (24% of solve) | **Yes** — `solve::bucket::BucketSolver` |
+| 3. Static allocation | per-round `Vec` growth | **Partial** — arena preallocates the leaf buffer; bucket counting-sort arrays sized from param, folded into the arena/bucket wins |
+| 4. In-place merge | fresh out-buffers each round | **No** (deliberate) — the arena's flat SoA already avoids per-row alloc; in-place would save the round's out-buffer alloc but complicates the bucket scatter — deferred |
+| 1. Compact index-pointer storage | full explicit index vectors per row | **Prototype only** (`rust/src/solve/pointer.rs`, `Req/PLAN.md` A6) — proves the pointer-tree representation reconstructs correctly against `solve_reference` and the verifier; not wired into `all_solvers()`, not KAT-validated, not memory-measured. Staged 3-approach path to production (graft `bucket.rs`'s counting-sort merge → tromp's xhash early-reject → bucket-addressing only if profiling justifies it) and the language/style rationale (extend this Rust prototype, don't port tromp's C bit-packing) are in `pointer.rs`'s own module docs |
+
+Measured timings for this progression (reference → arena → bucket, and the
+bucket-vs-rayon-parallel comparison) are [`BENCHMARK.md`](BENCHMARK.md) §6's
+data — not repeated here to avoid two copies of the same numbers drifting
+apart. All three solvers produce byte-identical solution sets
+(`all_solvers_agree` test), so every optimization is correctness-preserving.
+
+**Next, in priority order:**
+
+1. **Compact index-pointer storage (technique 1).** The one canonical 2016-17
+   technique still not in `all_solvers()`. Design proven correct in
+   `rust/src/solve/pointer.rs` (a prototype: plain sort instead of
+   `bucket.rs`'s counting sort, cross-round pointer-tree reconstruction
+   verified against `solve_reference` and the production verifier). What
+   remains: fold in the counting-sort merge, register as `solve::pointer`
+   in `all_solvers()`, gate on `all_solvers_agree` plus the A14 KAT vectors,
+   measure real peak memory with `req_memcheck`. Biggest remaining memory
+   lever, and what makes production (200,9) mining feasible.
+2. **In-place bucket merge (technique 4).** Fold the round output back into
+   the working buffer to drop the per-round out-buffer allocation.
+3. **Bucket-parallel merge (Tier 2).** Now that buckets are explicit, each
+   bucket is an independent unit of work — the natural parallel decomposition
+   rayon's generation-only solver could not reach.

@@ -6,14 +6,18 @@ Problem" ([eprint 2025/1351](https://eprint.iacr.org/2025/1351)), Section 5.2.
 Findings context: [../Equihash.md](../Equihash.md), F-A4.
 
 Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
-(what's implemented vs. specified-only); [PLAN.md](PLAN.md) — Groups A–C
-status and requirements, the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
+(what's implemented vs. specified-only); [ARCHITECTURE.md](ARCHITECTURE.md) —
+code/backend structure, plus which 2016-17 optimization technique each solver
+backend implements and measures; [PLAN.md](PLAN.md) — Groups A–D status and
+requirements (Group D: standalone historical-solver ports — RK/Khovratovich,
+RT/tromp, CS/Sequihash — for expertise and cross-implementation measurement),
+the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
 — throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
-solution size and memory across parameters, naive vs. index-pointer; [TMTO.md](TMTO.md)
-— the time-memory tradeoff research plan; [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)
-— structural attack-surface review; [../Dirs.md](../Dirs.md) — how the
-surrounding directories (ZKs reference clones, Zebro, Zero400/ZeroPerf) relate
-to this work.
+solution size and memory across parameters, naive vs. index-pointer;
+[SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — structural attack-surface
+review, including the time-memory-tradeoff (TMTO) test plan (§8-8a);
+[../Dirs.md](../Dirs.md) — how the surrounding directories (ZKs reference
+clones, Zebro, Zero400/ZeroPerf) relate to this work.
 
 ## Origin and scope
 
@@ -38,6 +42,64 @@ wire format so a solution mined by one verifies in the other:
   ordering checks). Standalone: bundles its own BLAKE2b, no zcash build coupling.
 - `rust/` — Rust, following the zebra `zebra-chain/src/work/equihash.rs` verifier
   conventions (a `check`-style validator plus a solver for round-trip tests).
+
+## Project direction and history
+
+Three stages, in order: (1) the Equihash literature/implementation review
+([../Equihash.md](../Equihash.md) — history, the 2016-17 ASIC-defeat
+mechanism, the 2025 theory; [../SOLVERS.md](../SOLVERS.md) — primary-source
+solver history: the original authors' reference implementation, xenoncat's
+index-pointer derivative, tromp's full commit history and its integration
+into zcashd); (2) the Requihash repair this review surfaced, specified and
+cross-validated here (§"What Requihash changes" below); (3) the current,
+ongoing work — implementation quality, concurrency, and memory-sizing fitness
+across parameters, which superseded further hash-vs-hash comparison as the
+priority once the ARM blake2b/blake3 campaign answered that question
+([PLAN.md](PLAN.md) "Current direction"). The single biggest open item across all
+of Req/ is compact index-pointer storage (`Req/PLAN.md` A6) — it unblocks
+(200,9)-scale mining, gives an honest memory floor, and is the prerequisite
+for the TMTO experiments in `SECURITY_ANALYSIS.md` §8. [PLAN.md](PLAN.md) is
+the authoritative, continuously-updated status tracker; nothing below should
+be trusted over it for "what's done vs. not."
+
+## How to read this documentation
+
+Pick the entry point that matches what you're doing, not the file that sounds
+closest to your question — several documents cover adjacent ground and each
+has one clear owner (cross-references below say who).
+
+- **First time here, want the shape of the whole thing.** Read this README
+  top to bottom (10 minutes), then skim [../Equihash.md](../Equihash.md)'s
+  Findings section (F-A1-F-A11) for the research background. Everything else
+  is reference material to dip into once you have a specific question.
+- **Tracking design, spec, or status.** [SPEC.md](SPEC.md) is the frozen
+  normative wire format (what's implemented vs. specified-only, per
+  configuration point). [PLAN.md](PLAN.md) is the live, broader work tracker
+  (all groups, all in-flight items) — cite SPEC for "what the format is,"
+  cite PLAN for "what's being worked on and by when."
+- **Reviewing results or measured conclusions.** [BENCHMARK.md](BENCHMARK.md)
+  for throughput/timing; [SIZING.md](SIZING.md) for memory/solution-size data
+  across parameter sweeps (including the paper's own published figures and a
+  documented correction trail). Both are evidence-graded (Measured/Reported/
+  Structural/Hypothesis) — check the grade before citing a number elsewhere.
+- **Investigating, debugging, or optimizing a specific solver/hash backend.**
+  [ARCHITECTURE.md](ARCHITECTURE.md) — the seam/trait structure, directory
+  layout, and (§7) exactly which 2016-17 optimization technique each backend
+  implements, with measured before/after numbers for each.
+- **Doing security/adversarial review, or picking up a TMTO/hypothesis
+  experiment.** [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) end to end — the
+  shortcut hunt, the lessons (L1-L8) and hypotheses (H1-H5), and the
+  step-wise experiment plan (§8) with its counting methodology (§8a). Start
+  at the critical path note (1→2→3) rather than reading the whole file if
+  you're picking up implementation work, not doing analysis.
+- **Understanding why Requihash exists at all, or the wider industry
+  context.** [../Equihash.md](../Equihash.md) (history, defeat, 2025 theory,
+  findings) and [../SOLVERS.md](../SOLVERS.md) (primary-source solver
+  history) — both live one level up in `Requihash/`, since they're about the
+  problem and the field, not this specific codebase.
+- **Figuring out how this relates to Zebro, ZKs, or Zero400/ZeroPerf.**
+  [../Dirs.md](../Dirs.md) — the directory map, including which surrounding
+  repos are safe to read-and-cite versus edit.
 
 ## What Requihash changes
 
@@ -110,12 +172,13 @@ accelerated backend. Build the Rust accelerated tiers with
 
 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) is a structural, adversarial analysis:
 the shortcut hunt (precomputation, parallelization, memory-reduction, and the novel
-regularity-structure surface), the expected-vs-achieved memory layout that explains
-Equihash's many-fold reduction, how block contents bind to the PoW, and eight
+regularity-structure surface), why the search pattern is what let the 2016-17
+optimizations cut memory many-fold (the layouts themselves are in
+[ARCHITECTURE.md](ARCHITECTURE.md) §7), how block contents bind to the PoW, and eight
 classified lessons applied methodically across Requihash construction variants. It
-carries five hypotheses (H1-H5, led by class-selective TMTO) and a step-wise
-experiment plan. Core patterns are illustrated in `figures/` (memory collapse,
-Wagner tree with attack surfaces, block binding). See also [TMTO.md](TMTO.md).
+carries five hypotheses (H1-H5, led by class-selective TMTO), a step-wise experiment
+plan, and the TMTO counting methodology (§8-8a). Core patterns are illustrated in
+`figures/` (memory collapse, Wagner tree with attack surfaces, block binding).
 
 ## Performance
 

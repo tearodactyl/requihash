@@ -70,7 +70,7 @@ choices never being revisited after 2017.
     tupleList = std::vector<std::vector<Tuple>>(tuple_n, def_tuples);
 
 Nested `vector<vector<Tuple>>` — one heap allocation per row, the exact
-representation `Req/OPTIMIZATION_HISTORY.md` and `Req/SIZING.md` §2a
+representation `Req/ARCHITECTURE.md` §7 and `Req/SIZING.md` §2a
 independently found dominates a naive Equihash solver's real allocation cost
 (measured ~59% of samples via time-profiling, 20–52× the "naive formula"
 peak memory via a counting allocator). **This is now directly confirmed**:

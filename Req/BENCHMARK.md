@@ -169,8 +169,8 @@ The `bucket` solver applies the tromp/xenoncat 2016-17 incomplete-bucket-sort
 technique (counting sort on the collision digit, O(m), replacing the O(m log m)
 comparison sort that was 24% of solve). It is 14% faster than arena and beats the
 generation-parallel rayon solver single-threaded. See
-[OPTIMIZATION_HISTORY.md](OPTIMIZATION_HISTORY.md) for the full 2016-17 technique
-mapping and what remains (compact index-pointer storage, the (2^k)/k space win).
+[ARCHITECTURE.md](ARCHITECTURE.md) §7 for the full 2016-17 technique mapping
+and what remains (compact index-pointer storage, the (2^k)/k space win).
 
 **Verifiers (verify seam), (96,5) us/verify:**
 
@@ -309,6 +309,11 @@ Rust crate* wraps that NEON code the way `blake3` wraps its own — the gap is
 in packaging and crate maintenance, not in whether BLAKE2b NEON code exists.
 Vendoring `BLAKE2/BLAKE2`'s `neon/` directly into a fourth `HashKind` here
 would be the apples-to-apples fix, not yet done (tracked in PLAN.md A13).
+The repo is now cloned locally (`~/Work/ZK/ZKs/blake2-reference`) for direct
+reference — this removes the "does this code even exist" uncertainty but
+does not shrink the remaining work, since "vendoring" here can't mean a
+plain FFI wrapper (no `build.rs` hook to attach one to, see below); the
+real task is a genuine translation to `core::arch::aarch64` intrinsics.
 Still pending, unrelated to the above: an x86-64/AVX2 leg, where
 `blake2b_simd`'s 4-way path should narrow the gap (deprioritized, PLAN.md A7).
 

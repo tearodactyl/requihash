@@ -2,13 +2,18 @@
 
 This document is a structural security analysis of the Equihash and Requihash
 constructions as implemented in `Req/`. It hunts for shortcuts (parallelization,
-precomputation, memory-reduction cracks), explains how the 2016-17 optimizations
-cut memory many-fold by reasoning about the actual memory layouts and search
-patterns, explains how block contents bind to the PoW computation, and then
-derives, classifies, and applies lessons to Requihash. It closes with proposed
-step-wise code changes and experiments. Findings context:
-[../Equihash.md](../Equihash.md) F-A1 through F-A10; the TMTO frame is in
-[TMTO.md](TMTO.md).
+precomputation, memory-reduction cracks), explains *why* the 2016-17
+optimizations' representation change was possible (the search pattern never
+needs the full index history) — the techniques themselves and Req's own
+implementation of them are in [`../SOLVERS.md`](../SOLVERS.md) §0 and
+[`ARCHITECTURE.md`](ARCHITECTURE.md) §7 — explains how block contents bind to
+the PoW computation, and then derives, classifies, and applies lessons to
+Requihash. It closes with proposed step-wise code changes and experiments,
+including the time-memory-tradeoff (TMTO) test plan (§8, §8a) — the 2017 TMTO
+literature (Equihash's own steepness claim and its two refutations) that
+motivates that plan is covered in [../Equihash.md](../Equihash.md) §3, not
+repeated here. Findings context: [../Equihash.md](../Equihash.md) F-A1
+through F-A10.
 
 Method note: claims are graded — Structural (follows from the algorithm/layout by
 construction), Measured (observed in the `Req/` harness), Hypothesis (a supposition
@@ -18,7 +23,7 @@ the goal is to find where Requihash *could* be short-cut, not to defend it.
 ## Table of Contents
 
 1. [The construction, exactly](#1-the-construction-exactly)
-2. [Memory layouts and search patterns](#2-memory-layouts-and-search-patterns)
+2. [Why the search pattern is what leaks the memory](#2-why-the-search-pattern-is-what-leaks-the-memory)
 3. [How block contents bind to the PoW](#3-how-block-contents-bind-to-the-pow)
 4. [Shortcut hunt: where Requihash could crack](#4-shortcut-hunt-where-requihash-could-crack)
 5. [Lessons, enumerated and classified](#5-lessons-enumerated-and-classified)
@@ -28,56 +33,32 @@ the goal is to find where Requihash *could* be short-cut, not to defend it.
 
 ## 1. The construction, exactly
 
-Both schemes solve a generalized birthday problem over a list of hash values and
-bind the solution to a block. The pieces, from the implementation and the
-[Equihash paper](https://ledger.pitt.edu/ojs/ledger/article/view/48) §3.4:
+Normative parameters, leaf generation (including the `i mod k` regularity
+binding), algorithm binding, and difficulty are specified in full in
+[`SPEC.md`](SPEC.md) §2-4, §7 — not repeated here. The single structural
+difference between Equihash and Requihash is the `i mod k` term in leaf
+generation (`Req/cpp/requihash.h::GenerateHash`, `rust/src/lib.rs::leaf_row`);
+everything below traces the security consequences of that one term.
 
-- **Parameters** (n, k): a solution is a set of `2^k` indices; collisions happen on
-  `ℓ = n/(k+1)` bits per round; the initial list has `N = 2^(ℓ+1)` entries.
-- **Leaf generation.** Equihash: item j = `H(person ‖ input ‖ nonce ‖ j)`, all
-  from one list. Requihash: item i = `H(person ‖ input ‖ nonce ‖ (i mod k) ‖ (i / k))`
-  — the `i mod k` term is the regularity binding, keying each tree-leaf position to
-  a list-class. (`Req/cpp/requihash.h::GenerateHash`, `rust/src/lib.rs::leaf_row`.)
-- **Algorithm binding.** The solver runs Wagner's tree: sort/bucket by the round's
-  ℓ-bit segment, pair colliding rows, XOR them (zeroing that segment), recurse. The
-  binding is that the intermediate `2^l`-XORs must have their leading bits zero — a
-  fixed algorithm flow — which the paper proves yields only ~2 solutions on average
-  (amortization-free). Canonical lexicographic ordering of paired subtrees kills
-  duplicate solutions from swaps.
-- **Difficulty.** The block is valid when the hash of the header (which commits to
-  the solution) meets the difficulty target — separate from solution validity.
+## 2. Why the search pattern is what leaks the memory
 
-The single structural difference between Equihash and Requihash is the `i mod k`
-term in leaf generation. Everything below traces the consequences of that one term.
+The 2016-17 solvers cut Equihash's naive memory footprint many-fold by
+changing *representation*, not algorithm — the specific techniques, their
+authorship, and Req's own implementation of them are in
+[`../SOLVERS.md`](../SOLVERS.md) §0 and [`ARCHITECTURE.md`](ARCHITECTURE.md)
+§7. The security-relevant fact is *why* the cut was possible at all: the
+*search pattern* — Wagner's bucket-and-merge — only ever needs the collision
+segment adjacent, never the full index history. The indices are dead weight
+during the search; they are only needed to emit the final solution. So
+representing them as reconstructable pointers costs nothing during the search
+and everything is recoverable at the end. This is the structural fact behind
+F-A1: **the memory hardness was never in the search, only in the naive
+representation of the search's bookkeeping** [Structural].
 
-## 2. Memory layouts and search patterns
-
-### 2.1 The expected (paper) layout vs the achieved layout
-
-The Equihash paper's naive description implies a memory footprint that the 2016-17
-solvers cut many-fold. The gap is entirely in how rows are *represented* and how
-collisions are *found*.
-
-**Expected layout (naive).** Each row carries its full accumulated index tuple. At
-round r a row holds `2^r` indices (each `sizeof(eh_index)` = 4 bytes) plus its
-remaining hash. Over k rounds the index storage per surviving row grows as
-`2^r`, and the naive solver materializes growing *lists of full index tuples*.
-For (200,9) this is where the paper-implied hundreds-of-MB figure comes from.
-
-**Achieved layout (2016-17).** Four representational changes collapse this:
-
-| Technique | What it changes in the layout | Memory effect |
-|---|---|---|
-| Index-pointer storage | Store a binary tree of index *pairs* (two parent pointers), not the full `2^r`-index tuple; reconstruct full indices only at the end | Index storage per row drops from `2^r` to O(1); saves a factor of `(2^k)/k` |
-| Hash trimming | Drop the collided ℓ-bit segment after each round | Row hash shrinks `(k+1)·ℓ → ℓ` over the rounds |
-| Incomplete bucket sort | Bucket by the collision digit; never hold a fully sorted copy | Removes the sort's second-array overhead |
-| Static allocation | Size all buffers once from parameters | Removes per-round growth/fragmentation |
-
-The compound effect is the many-fold reduction: index pointers alone are the
-`(2^k)/k` win (for k=9 that is `512/9 ≈ 57x` on the index component), and the paper
-records the concrete endpoint — xenoncat 178 MB, tromp 144 MB, and roughly 49 MB
-once all of it is counted at (200,9) [Structural for the mechanism; Reported for the
-figures, Equihash.md §3].
+This is also why the reduction is a *representation* attack, not an
+*algorithmic* one: the number of hash evaluations and comparisons is
+unchanged; only the bytes held resident drop. A memory-hard PoW whose memory
+lives in reconstructable bookkeeping is not memory-hard in the bookkeeping.
 
 ![Memory collapse at (200,9)](figures/memory_collapse.svg)
 
@@ -85,36 +66,15 @@ figures, Equihash.md §3].
 growing-index-tuple layout versus the index-pointer/hash-trimmed/static layout, log
 scale. Hash-count is unchanged across all four bars — only resident bytes drop.*
 
-### 2.2 Why the search pattern is what leaks the memory
-
-The reason the memory could be cut is that the *search pattern* — Wagner's
-bucket-and-merge — only ever needs the collision segment adjacent, never the full
-index history. The indices are dead weight during the search; they are only needed
-to emit the final solution. So representing them as reconstructable pointers costs
-nothing during the search and everything is recoverable at the end. This is the
-structural fact behind F-A1: **the memory hardness was never in the search, only
-in the naive representation of the search's bookkeeping** [Structural].
-
-This is also why the reduction is a *representation* attack, not an *algorithmic*
-one: the number of hash evaluations and comparisons is unchanged; only the bytes
-held resident drop. A memory-hard PoW whose memory lives in reconstructable
-bookkeeping is not memory-hard in the bookkeeping.
-
-### 2.3 The Req/ implementation's layouts, measured
-
-The `Req/` solvers instantiate points on this spectrum, and the profile
-(BENCHMARK.md) confirms the structural story:
-
-- `solve::reference` — naive: per-row `Vec` for hash and full index tuple. 59% of
-  time in allocation [Measured].
-- `solve::arena` — flat struct-of-arrays, full explicit indices, hash-trimmed. 1.6x
-  faster; the allocation share collapses [Measured].
-- `solve::bucket` — arena + incomplete bucket sort (counting sort on the collision
-  digit). Further 14%, 1.86x cumulative [Measured].
-- Compact index-pointer storage (the `(2^k)/k` win) — **not yet implemented**; the
-  arena/bucket solvers still carry full explicit index tuples, so they sit at the
-  *high-memory* end. This is the single biggest unrealized memory reduction and the
-  gate to (200,9) [Structural].
+Req's own solvers instantiate points on this spectrum, from the naive
+high-memory end (`solve::reference`) toward the floor (`solve::bucket`) —
+measured layout facts are in [`ARCHITECTURE.md`](ARCHITECTURE.md) §7, not
+duplicated here. Compact index-pointer storage (the `(2^k)/k` win) is **not
+yet implemented**; Req's solvers still carry full explicit index tuples, so
+they sit at the *high-memory* end. This is the single biggest unrealized
+memory reduction and the gate to (200,9) [Structural] — and per H5 below, it
+means Req's current memory numbers are not yet representative of the
+scheme's floor.
 
 ## 3. How block contents bind to the PoW
 
@@ -214,7 +174,7 @@ decentralization balance) but it should be characterized.
 
 *Equihash exposure.* The Bernstein truncation tradeoff: store `N/q` elements, repeat
 `q^(k+1)` times, penalty `C(q) = q^k` (or the improved `≈4·2^(n/(k+1))·q^((k+1)/2)`).
-Alcock-Ren: no bound proven for the loose problem (TMTO.md §1b).
+Alcock-Ren: no bound proven for the loose problem (`../Equihash.md` §3).
 
 *Requihash change.* Requihash restores the regular k-list problem, so the paper's
 *regular*-problem steepness k/2 (Prop 6) applies legitimately where it did not for
@@ -332,8 +292,8 @@ its rough size. All preserve the cross-validation gate (every new solver must pa
    *Size*: medium — a new solver backend plus a reconstruction pass. **Do first.**
 2. **Memory-capped solver (`solve::tmto`) with Bernstein truncation.** Parameter q;
    store `N/q` leaves, repeat, measure penalty vs q. *Establishes*: empirical
-   steepness of the regular Requihash problem; direct test of the 12x claim
-   (TMTO.md Experiment 1). *Size*: medium.
+   steepness of the regular Requihash problem; direct test of the 12x claim.
+   *Size*: medium.
 3. **Class-selective TMTO variant (tests H1).** Extend `solve::tmto` to drop whole
    list-classes rather than uniform truncation; compare its penalty curve to the
    generic one. *Establishes*: whether the regularity opens a better tradeoff — the
@@ -353,7 +313,87 @@ its rough size. All preserve the cross-validation gate (every new solver must pa
    ~2-solutions-per-list check across parameters and confirm canonical ordering
    eliminates duplicates. *Establishes*: amortization-freeness empirically. *Size*:
    tiny.
+8. **Iterated generator (`x_j = H^m(...)`).** `m` multiplies the recomputation
+   term specifically (honest solver: m× once at generation; TMTO adversary: m×
+   per recomputation), so measured steepness `s_eff` should rise with m — while
+   m also shifts the gen/merge split toward hashing, degenerating toward
+   hashcash at large m. *Establishes*: both slopes and the useful m window;
+   consensus-side the verification budget bounds it (`2^k · m` hashes per
+   verify). Joins the sweep from the Zebro D3 direction (era-scoped PoW fields;
+   `~/Work/ZK/Zebro/CONSENSUS.md` §2.2). *Size*: small once (2) exists.
+9. **BLAKE3 backend.** The same counters (8a below) under a blake3 generator
+   (XOF-native output, `derive_key` domain separation). *Establishes*: that a
+   hash swap moves only the generation constant, not the steepness — and
+   prices the miner-kernel-reset trade with numbers instead of opinions.
+   *Size*: small once (2) exists.
 
 The critical path is 1 → 2 → 3: honest memory floor, then real steepness, then the
 class-selective attack that could undercut the whole Requihash value proposition.
 Everything else is characterization around that spine.
+
+### 8a. Method: counting first, wall-clock second
+
+The exponent `s` (items 2-3, 8-9) is a property of the algorithm, not the
+hardware, so it should fall out of deterministic accounting — no benchmark
+noise, no machine dependence, fully reproducible. The harness should emit
+**counters, not timings**, as the primary instrument:
+
+- hashes computed, split generation vs recomputation,
+- bytes read/written **by stride class** (sequential vs bucket-random vs
+  pointer-chase — the classes a memory controller prices differently),
+- peak bytes resident,
+
+per (variant × hash-function × iteration-count m × memory-cap q); fitting `s`
+is a slope over counted recomputations. Wall-clock runs are demoted to one
+calibration per hardware class: the weight vector (ns and nJ per hash, per
+random access, per sequential byte) that converts counts into adversary
+economics. The counters are designed to catch the two things naive counting
+misses: access-pattern regularity (the index-pointer technique changes zero
+hash calls — its effect lives entirely in the stride-class distribution,
+which is what made it ASIC-relevant, `ARCHITECTURE.md` §7) and strategy
+diversity (the claim under test is "no strategy beats q^{k/2}", so the
+harness enumerates strategies — bucket shedding policies, the class-resident
+layouts of H1 — and counts each; item 3's class-selective pass is a search
+over strategies, each then evaluated deterministically).
+
+### 8b. Assumptions about implementation and harness quality the sweep rests on
+
+The steepness curve items 2-3/8-9 produce is only as trustworthy as four
+things that are easy to get wrong silently — recorded explicitly so a future
+pass doesn't have to re-derive why each one matters:
+
+1. **The swept solver must already be near the honest memory floor.** The
+   curve measures cost-of-capping-memory *relative to a baseline* — if the
+   baseline is itself bloated (today's `solve::bucket` still carries full
+   explicit index vectors, not the pointer representation `solve/pointer.rs`
+   prototypes), the measured curve conflates "cost of capping" with "cost of
+   an already-wasteful representation." This is the concrete reason item 1
+   (index-pointer storage) precedes item 2 in the critical path above, not
+   just scheduling convenience: sweeping against `bucket` today would
+   produce *a* curve, but not necessarily the one the 12x-penalty claim
+   (F-A4) is actually about.
+2. **The harness must count by stride class, not just hash/byte totals.**
+   §8a already specifies this, but it is worth stating as a failure mode:
+   a harness that counts hashes and bytes without the sequential/
+   bucket-random/pointer-chase breakdown would silently miss the exact
+   signal that made the 2016-17 techniques ASIC-relevant in the first place
+   (memory *access pattern*, not hash count) — it would still produce a
+   number, just not one that means what the steepness claim needs it to
+   mean.
+3. **The memory-capped (Bernstein-truncation) solver must pass the same
+   `all_solvers_agree`-style correctness gate as every other backend.** A
+   truncating solver that silently drops valid solutions along with the
+   ones it's supposed to discard would produce an artificially steep-looking
+   curve — fewer solutions found is not the same claim as higher cost paid,
+   and the two are only distinguishable if correctness is verified
+   independently of the steepness measurement itself.
+4. **The truncation logic must respect list-class boundaries, not just
+   truncate uniformly, or item 3 (class-selective TMTO, H1) cannot even be
+   tested.** H1 asks whether dropping whole list-classes beats generic
+   uniform truncation — a harness that only implements uniform Bernstein
+   truncation has no way to represent the alternative hypothesis it exists
+   to test, regardless of how well-instrumented it is otherwise.
+
+None of these four are extra engineering polish — each one, if wrong, would
+produce a plausible-looking steepness number that doesn't answer the
+question A5 exists to answer.

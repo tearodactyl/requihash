@@ -19,6 +19,7 @@ Chain-side packaging (Zebro era fields) consumes this spec and adds nothing to i
 | `hash=blake2b, m≥2` | Specified (§5); not implemented |
 | `hash=blake3` (any) | Specified (§6); not implemented |
 | Compact solution encoding | Sized (§8.2); codec not implemented |
+| `encoding` axis (leaf-string byte serialization, separate from `keying`) | **Proposed, not adopted** (§10) — `binary_le32` (current, implicit) vs. `ascii_decimal` (matches the paper's own Python Sequihash reference) |
 
 ## 2. Parameters and validity
 
@@ -177,3 +178,153 @@ One JSON object per file:
 A consumer must reject a vector whose optional fields name a configuration it
 does not implement. This format is the only coupling surface to chain-side
 benchmarking (a verifier consumes vectors; it never links this crate).
+
+## 10. Proposed axis: `encoding` — separating the regularity binding from its byte serialization
+
+**Status: proposal, not adopted.** Not yet a configuration point in §1's
+table; recorded here because the family object (line 5 above) currently
+conflates two independent decisions inside `keying`, and making them
+separate axes turns three separately-implemented things (Equihash,
+Requihash, and the paper's own Python Sequihash reference) into three named
+points in one two-axis space instead.
+
+### 10.1 The finding that motivates this
+
+`Req/cpp/requihash.h`'s own comment (§4.1's implementation) already says
+the relevant thing: *"any fixed leaf→class map that is non-constant across
+the tree achieves the same effect"* as `i mod k`. The regularity
+**binding** — draw leaf `i` from list-class `i mod k` — is the paper's
+actual contribution (eprint 2025/1351 §5.2) and is what F-A4's ASIC-penalty
+claim is about. How `(class, counter)` gets turned into hash-input bytes is
+a separate, non-cryptographic decision, and the two existing
+implementations made different arbitrary choices:
+
+- **This repo (`keying=regular`, §4.1)**: `le32(class) || le32(counter)` —
+  8 bytes, binary, fixed-width.
+- **The paper's own Python reference**
+  (`~/Work/ZK/ZKs/Generalized-Birthday-Problem/GBP-solver/k_list_algorithm.py`,
+  `compute_item(i, j)`): `f"{i}-{j}".encode()` — a variable-length ASCII
+  decimal string with a literal `-` separator, e.g. `b"3-42"`.
+
+Checked directly: nothing in the paper's own artifact repo (code or
+README-level text) mandates the string form as load-bearing — the paper's
+contribution is stated in terms of the abstract binding (`x_i` from list
+`i-1 mod K`), not a wire encoding. The string-vs-binary difference is very
+likely just "two independent implementations, two independent quick
+choices," not a deliberate design decision either side made for a reason —
+recorded as a finding, not asserted as certain, since neither artifact's
+authors were asked directly.
+
+### 10.2 Proposed parametrization
+
+Two independent axes, where today's `keying` conflates axis 1 with a fixed
+choice on axis 2:
+
+**Axis 1 — `keying`** (already exists, §1's table): `single` (no class
+binding — classic Equihash) vs. `regular` (`i mod k` binding — Requihash).
+
+**Axis 2 — `encoding`** (proposed, new): how the keying material for a
+given leaf is turned into bytes before hashing.
+- `binary_le32`: `le32(class) || le32(counter)` for `regular`; `le32(i)`
+  for `single`. (This repo's current, only implemented choice.)
+- `ascii_decimal`: `f"{class}-{counter}".encode()` for a `regular`-
+  equivalent; `f"{i}".encode()` for a `single`-equivalent. (Matches the
+  paper's own Python reference exactly.)
+
+Naming choice: `encoding`, not `serialization` or `wire_format`, to keep it
+visually and conceptually distinct from §8's "Solution encodings" (which is
+about the *output* wire format, a completely different thing from this
+axis, which is about the *input* to leaf hashing — worth a reader not
+confusing the two just because both use the word "encoding").
+
+### 10.3 Mapping to the three concrete instances
+
+| Instance | `keying` | `encoding` | Notes |
+|---|---|---|---|
+| Equihash (Zcash, tromp, Khovratovich original) | `single` | `binary_le32` (or scheme-specific packing, e.g. Zcash's `⌊512/n⌋`-leaves-per-call — a third, deployment-specific encoding not modeled here, see §4.3's own note) | The historical baseline |
+| Requihash (this repo) | `regular` | `binary_le32` | Current, only implemented point |
+| Sequihash (paper's own Python reference) | `regular` | `ascii_decimal` | Same regularity binding as Requihash, different byte serialization — **not** a different scheme cryptographically, per 10.1 |
+
+The paper's own name for its construction is "Sequihash" (`SIZING.md` §0);
+this repo's "Requihash" and the paper's own "Sequihash" reference
+implementation are therefore the *same point on axis 1* (`keying=regular`)
+and differ only on axis 2 — a fact obscured by treating them as two
+separately-named, separately-ported schemes rather than one point with two
+encoding instantiations.
+
+### 10.4 Security and complexity evaluation
+
+**Security**: `encoding` should have **no effect on the security argument**
+at all, and this is itself worth stating as a testable claim, not just an
+assumption. The regularity binding (axis 1) is what F-A4's steepness claim
+and H1-H8's shortcut-hunt (`SECURITY_ANALYSIS.md`) are about; nothing in
+that analysis depends on *how* the class/counter pair is serialized, only
+on *that* a leaf's class is fixed and non-constant across the tree. A
+class-boundary-respecting attack (H1, class-selective TMTO) would transfer
+identically regardless of `encoding`, since it operates on the abstract
+list-class structure, not the byte layout. This is falsifiable: if a future
+finding showed `encoding` *did* matter to security, that would itself be a
+significant and surprising result worth its own write-up, not something
+this proposal should assume away without flagging the possibility.
+
+**Complexity**: real, but small and asymmetric.
+- `binary_le32` is fixed-width (8 bytes for `regular`, 4 for `single`) —
+  cheap to hash, cheap to reason about, no allocation beyond the fixed
+  buffer already used today.
+- `ascii_decimal` is variable-width (grows with the decimal digit-count of
+  `class`/`counter`, which grows with `k`/`n`) — a real, if small,
+  per-leaf cost difference (variable-length formatting plus a heap
+  allocation for the formatted string in a naive implementation,
+  vs. `binary_le32`'s fixed stack buffer). This is a legitimate, measurable
+  performance difference between the two encodings, independent of the
+  security-neutrality claim above — worth stating so "encoding doesn't
+  affect security" isn't read as "encoding doesn't matter at all."
+- Implementation cost of adding the axis: small. `GenerateHash`/`leaf_row`
+  (the two places `keying=regular`'s binary encoding is currently
+  hardcoded, `Req/cpp/requihash.h` and `rust/src/lib.rs`) would each need
+  an `encoding` parameter threaded through, with `ascii_decimal` as a
+  second branch — a config-surface change, not an algorithmic one.
+
+### 10.5 Personalization/context as a related, third axis
+
+`context` (line 5's family object; §3's `person` field) is already a real,
+existing configuration point, and is worth naming explicitly alongside
+`keying`/`encoding` since all three answer a similar question ("how is a
+scheme distinguished from its neighbors") at different layers:
+
+- **`context`**: distinguishes *this scheme family* from others (this
+  repo's `"ReqhashPoW"` stem vs. Zcash's `"ZcashPoW"`-based layout, §3) —
+  already flagged as "out of scope for v1 compatibility" (§3's own note).
+- **`keying`**: distinguishes *regularity binding* (whether a leaf's class
+  is fixed at all).
+- **`encoding`** (this proposal): distinguishes *byte serialization* of
+  whatever `keying` produces.
+
+The paper's own Python reference has no `context`/personalization field at
+all — its 16-byte "nonce" plays the combined role of this repo's
+`input || nonce || person` prefix collapsed into one opaque value, with no
+domain separation baked in between different `(n,k)` parameter sets or
+scheme names. This is a fourth, separate finding worth recording precisely
+for any future implementation claiming compatibility with the Python
+reference: matching `encoding=ascii_decimal` alone is not sufficient for
+byte-exact compatibility unless the `context`/prefix construction is also
+matched — a real implementation must decide whether to reproduce the
+Python reference's collapsed single-nonce-field design or keep this repo's
+separated `input`/`nonce`/`person` structure and only match `encoding`, and
+must state which choice it made.
+
+### 10.6 What this proposal does not do
+
+Does not promote `encoding` to §1's status table (that requires actual
+implementation, or at minimum an accepted decision to implement it later).
+Does not change any of Group D's task specs (`Req/PLAN.md` D1-D3) — RK is
+unaffected (Khovratovich's original has its own independent leaf
+construction, unrelated to either encoding); RT is unaffected (tromp's
+index-pointer *algorithm* is orthogonal to leaf-string encoding entirely);
+CS's task as specified (a standalone C++ port matching the Python
+reference) remains the right execution vehicle for validating this
+proposal's `10.1`/`10.3` claims empirically, once built — CS's own output
+is exactly the artifact that would let this repo's engine (with `encoding`
+added per this proposal) be cross-validated against an independent,
+non-Req implementation of `ascii_decimal` mode, closing the loop between
+this design proposal and Group D's execution work.

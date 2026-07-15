@@ -11,6 +11,10 @@ pub mod arena;
 pub mod bucket;
 #[cfg(feature = "rayon")]
 pub mod parallel;
+/// Design + prototype for PLAN.md A6 (compact index-pointer storage).
+/// Deliberately not registered in `all_solvers()` — see module docs for
+/// what's proven vs. what a production `solve::pointer` backend still needs.
+pub mod pointer;
 
 pub trait Solver {
     fn solve(&self, engine: &Requihash) -> Vec<Vec<EhIndex>>;
