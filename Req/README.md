@@ -8,14 +8,19 @@ Findings context: [../Equihash.md](../Equihash.md), F-A4.
 Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
 (what's implemented vs. specified-only); [ARCHITECTURE.md](ARCHITECTURE.md) —
 code/backend structure, plus which 2016-17 optimization technique each solver
-backend implements and measures; [PLAN.md](PLAN.md) — Groups A–D status and
-requirements (Group D: standalone historical-solver ports — RK/Khovratovich,
-RT/tromp, CS/Sequihash — for expertise and cross-implementation measurement),
-the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
+backend implements and measures; [PLAN.md](PLAN.md) — Groups A–C status and
+requirements, the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
 — throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
 solution size and memory across parameters, naive vs. index-pointer;
 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — structural attack-surface
 review, including the time-memory-tradeoff (TMTO) test plan (§8-8a);
+[SOLVER_CORPUS.md](SOLVER_CORPUS.md) — standalone historical solver/verifier
+ports (RK/Khovratovich solver, RZ/pinned-crate verifier, RT/tromp solver,
+CS/Sequihash) for expertise and cross-implementation measurement, separate
+from the pending Group A-C work;
+[../UNIHASH.md](../UNIHASH.md) — a proposed unifying parametrization across
+Equihash/Requihash/Sequihash (research, not adopted, kept separate from this
+spec so it doesn't pollute pending-implementation context);
 [../Dirs.md](../Dirs.md) — how the surrounding directories (ZKs reference
 clones, Zebro, Zero400/ZeroPerf) relate to this work.
 

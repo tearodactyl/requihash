@@ -163,6 +163,14 @@ before use here — every prediction matched the published value to within
 validation arithmetic: `Req/SIZING.md` git history / this session's working
 notes.
 
+**Note on `scripts/equihash_formulas.py`**: this table's underlying
+formulas are also implemented there as a reusable script (`--csv`/
+`--validate` modes), but its `SWEEP_POINTS` currently reproduce an older,
+smaller version of the sweep below, not this table as it stands —
+flagged as out of sync in `Req/PLAN.md` A20, not yet fixed. Do not treat
+the script's own default output as authoritative until that's resolved;
+this table (below) is the current source of truth.
+
 | k | n | ell | init list N | sol size (min/compact) | verify hashes (m=1) | naive peak mem (this repo's formula) | Equihash memory (extrapolated) | Requihash memory (extrapolated) |
 |---|---|---|---|---|---|---|---|---|
 | 5 | 24 | 4 | 2^5 | 20/16 B | 32 | 224 B | 96 B | 272 B |
