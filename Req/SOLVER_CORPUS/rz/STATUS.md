@@ -306,6 +306,54 @@ vendored solve path (not `verify.rs`/`minimal.rs`), and states clearly
 this pass covers `(144,4)` only with `(200,8)`/`(200,9)` as explicit
 follow-on work not yet done.
 
+## Step 6: `src/bin/rz_bench.rs` — actual measured memory and timing
+
+Not part of the original task's step list, added afterward because none
+of the timing notes above were more than one-off hand-run `time` figures,
+and peak memory had never been measured at all. `rz_bench.rs` uses the
+same counting-global-allocator pattern as `Req/rust/src/bin/req_memcheck.rs`,
+plus `std::time::Instant`, run against the same 3 nonces `tests/cross_check.rs`
+already validates.
+
+**Measured** (Apple Silicon, `--release`, one run per nonce, same input
+used throughout this file):
+
+| nonce | solutions | wall time | peak memory (counting allocator) |
+|---|---|---|---|
+| 28 zero bytes | 4 | 5.10 s | 6.27 GB |
+| 28×`0x01` | 2 | 4.06 s | 6.27 GB |
+| 28 bytes, last `0x2a` | 1 | 4.04 s | 6.27 GB |
+
+Cross-checked against the OS's own `maximum resident set size` (`/usr/bin/time -l`)
+for the first nonce: **6733873152 bytes** (6.27 GB) — matches the
+counting allocator's figure almost exactly, confirming the harness
+measures correctly (not just internally consistent with itself).
+
+**Direct comparison against the vendored C original**, same input/nonce,
+same machine, same `/usr/bin/time -l` measurement: `rz_xcheck_144_4`
+peaks at **2,694,184,960 bytes (2.69 GB)**, wall time **4.23s**. So at
+(144,5): **the Rust port uses ~2.3x the C original's peak memory**
+(6.27 GB vs. 2.69 GB) at roughly comparable wall time. This is the actual
+number behind the "Storage layout note" above's qualitative prediction
+("peak memory usage is higher than the C's arena, ... worked fine for a
+single (144,4) run but is much less memory-conscious") — that prediction
+is now confirmed and quantified, not just plausible.
+
+**In context of `Req/SIZING.md`'s published/extrapolated Equihash(144,5)
+figures**: Table 3's own asymptotic figure is ~588 MB; eprint 2025/2141
+states Tromp's own real (144,5) solver at ~2.5 GB (`Req/PAPERS.md` §1).
+This session's directly-measured C original (2.69 GB) lands close to
+that independently-published 2.5 GB figure — a real, if rough,
+cross-check between two different sources measuring similar things. The
+Rust port's 6.27 GB is well above both, consistent with the up-front
+(not arena-reused) `trees0`/`trees1` allocation already flagged as a
+known simplification, not a new mystery.
+
+**Not yet done**: reducing this gap (replicating the C's arena-reuse
+layout, or some other memory-reduction change) is out of scope for this
+pass — flagged here as a concrete, now-quantified follow-on rather than
+left as an unmeasured qualitative caveat.
+
 ## Final summary (all steps complete)
 
 | Step | Status |
@@ -315,6 +363,7 @@ follow-on work not yet done.
 | 3. `src/bin/rz_gen.rs`, JSON output matches C harness shape | Done, byte-identical output confirmed manually |
 | 4. `tests/cross_check.rs`, 3 nonces vs C oracle | Done, PASS on all 3 (both debug and release profiles) |
 | 5. `README.md` | Done |
+| 6. `src/bin/rz_bench.rs`, measured memory/timing | Done — 6.27 GB peak / ~4-5s wall (Rust) vs. 2.69 GB peak / 4.2s wall (C), same nonce, same machine |
 
 `cargo test` (plain, debug profile, whole workspace) passes. `cargo
 build` (whole workspace) is clean with zero warnings.

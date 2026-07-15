@@ -91,6 +91,11 @@ to check all prerequisites in one step.
 - `tests/cross_check.rs` — runs both the Rust port and
   `rz_xcheck_144_4` on 3 distinct nonces, asserts the returned index
   *sets* match exactly.
+- `src/bin/rz_bench.rs` — measures actual peak memory (counting global
+  allocator) and wall time of `solve_144_4`, `cargo run --release --bin
+  rz_bench` (or `-- --csv out.csv` for exact byte counts). See STATUS.md
+  step 6 for the measured numbers and a direct comparison against the C
+  original's own peak memory.
 
 ## Validation status
 

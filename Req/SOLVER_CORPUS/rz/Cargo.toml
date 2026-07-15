@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "rz_gen"
 path = "src/bin/rz_gen.rs"
 
+[[bin]]
+name = "rz_bench"
+path = "src/bin/rz_bench.rs"
+
 [dependencies]
 blake2b_simd = { version = "1", default-features = false }
 
