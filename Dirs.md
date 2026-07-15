@@ -68,23 +68,41 @@ Equihash/PoW file locations, verified:
 `Zeros` (no extension, ZKs top level) — plain-text Bitcoin Core multisig
 tutorial, unrelated to the Zero coin.
 
-Equihash solver implementations (see `SOLVERS.md` §0 for full analysis):
+Equihash solver implementations — these five clones are the ones
+`SOLVERS.md` §0 and `Req/SOLVER_CORPUS.md` (RK/RZ/RT/CS's own source
+locations) actually document and cite; not repeated here beyond a bare
+locator, since both documents already give repo, remote, commit
+provenance, and per-file analysis in more depth than a table in this
+lookup file could without drifting out of sync:
 
-| Repo | Remote | Note |
-|---|---|---|
-| `equihash-khovratovich` | `khovratovich/equihash` | Original authors' reference solver. CC0. Settable N/K |
-| `equihash-tromp` | `tromp/equihash` | Tromp's C solver, 143 commits 2016–2018 |
-| `equihash-xenon` | `xenoncat/equihash-xenon` | Index-pointer origin. Hand-written AVX asm, ships an algorithm-design PDF |
-| `BTCGPU-equihash` | `BTCGPU/equihash` | Bitcoin Gold's fork of tromp's solvers |
-| `Generalized-Birthday-Problem` | `tl2cents/Generalized-Birthday-Problem` | 2025/1351 paper's own artifacts; runnable k-list solver, ISD complexity figures |
+- `equihash-khovratovich` (`khovratovich/equihash`) — RK's source.
+- `equihash-tromp` (`tromp/equihash`) — RT's source (full multi-core
+  `equi_miner.h`); also the pre-freeze ancestor of the single-core-stripped
+  copy RZ ports.
+- `equihash-xenon` (`xenoncat/equihash-xenon`) — index-pointer origin,
+  analyzed in full in `SOLVERS.md` §0.2.
+- `BTCGPU-equihash` (`BTCGPU/equihash`) — Bitcoin Gold's fork of tromp's
+  solvers.
+- `Generalized-Birthday-Problem` (`tl2cents/Generalized-Birthday-Problem`)
+  — the 2025/1351 paper's own artifacts; CS's source.
+
+Hash-primitive clones (blake2b/blake3, behind `Req/`'s Seam A — see
+`Req/ARCHITECTURE.md` §1a): `blake2-reference` (`BLAKE2/BLAKE2`, the
+official C reference, `neon/` NEON backend analyzed in `BENCHMARK.md` §7a/
+PLAN.md A13), `blake2_simd` (`oconnor663/blake2_simd`, the Rust crate this
+project and Zebra both depend on), `BLAKE3` and `BLAKE3-specs`
+(`BLAKE3-team/BLAKE3` and its spec repo). Full citations for all of
+these: `PAPERS.md` §10 / `Equihash.md` §9.
 
 Reach into these clones for: real `(n,k)`/personalization cross-checks
 (grep `chainparams.cpp` directly, don't trust memory); a second independent
 Rust verifier (`zebra`/`ycash-zebra` vs. Req's own `rust/src/lib.rs` and
 `zcash/src/rust/src/equihash.rs`); comparing Req's C++ against zcashd's actual
 in-tree fork (`zcash/src/crypto/equihash.{h,cpp,tcc}`, forked at `690fc5eff`,
-never resynced — `SOLVERS.md`). `Req/PLAN.md` A6 (index-pointer solver) has
-no existing clone to copy from — genuinely unbuilt work.
+never resynced — `SOLVERS.md`). `Req/PLAN.md` A6 (Req's own future
+production index-pointer solver) has no existing clone to copy from —
+genuinely unbuilt work, distinct from RK/RZ/RT's standalone historical
+ports above, which do have real upstream sources.
 
 ## 2. Zebro
 
@@ -92,9 +110,11 @@ Entry point: `~/Work/ZK/Zebro/ZEBRO.md` §1 (restart procedure).
 
 - `Req/PLAN.md` Group C (C1: Req mines cross-parameter vectors →
   `zebro-bench` verify curve) — not started either side.
-- Zebro's M3 evidence package needs Req's counting harness (not built) and
-  `zebro-bench` curves across PoW parameter sets — `Req/SIZING.md` §2a
-  (measured only to (96,5)) is a prerequisite, not just adjacent.
+- Zebro's M3 evidence package needs `zebro-bench` curves across PoW
+  parameter sets — Req's own counting-allocator memory harness
+  (`rust/src/bin/req_memcheck.rs`) is built and measured, but only up to
+  (96,5) (`Req/SIZING.md` §2a); extending past that is `Req/PLAN.md` Q2,
+  a prerequisite for M3, not just adjacent.
 - Zebro `ARCHITECTURE.md` uses the same swap-seam pattern as
   `Req/ARCHITECTURE.md` for hash/solve/verify backends.
 

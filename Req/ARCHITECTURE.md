@@ -321,6 +321,36 @@ data — not repeated here to avoid two copies of the same numbers drifting
 apart. All three solvers produce byte-identical solution sets
 (`all_solvers_agree` test), so every optimization is correctness-preserving.
 
+## 8. Measurement discipline: `reqbench`, shared across `Req/rust` and `SOLVER_CORPUS`
+
+Any timing or memory number reported anywhere in this tree — `Req/rust`'s
+own benches or a `SOLVER_CORPUS` port's — follows one discipline, specified
+in [`BENCH.md`](BENCH.md): repeated trials with min/median/MAD statistics
+(never a single sample), git-commit/dirty-tree provenance stamped on every
+record, and peak-memory figures cross-checked against a second, independent
+instrument (OS-reported RSS) before being trusted — not because any one of
+these is exotic, but because each closes a real gap this project hit once:
+RZ's first bench pass (`SOLVER_CORPUS/rz/src/bin/rz_bench.rs`, an earlier
+session) reported single-sample timings with no provenance and a memory
+figure checked against OS RSS exactly once, by hand, rather than as a
+standing part of the tool.
+
+`Req/rust`'s own `report.rs` (statistics/JSON-lines/baseline-comparison)
+predates this and stays as its own, intentionally separate implementation
+— `Req/rust` has no dependency on anything under `SOLVER_CORPUS/`, and
+coupling it to a directory whose whole design point (`SOLVER_CORPUS.md`'s
+own cross-cutting requirements) is standalone-per-port ports would cut
+against that design. Instead, `SOLVER_CORPUS/reqbench/` is a **new,
+separate, dependency-free crate** — a generalized extraction of
+`report.rs`'s statistics logic (its identity key is a plain string, not a
+hardcoded `(n,k)` pair, since a port's natural key is `(WN,WK,RESTBITS)` or
+similar) plus the provenance-stamping and memory-cross-check pieces
+`report.rs` never had. Every `SOLVER_CORPUS` port depends on `reqbench` via
+a relative path; `Req/rust` does not depend on it and is not required to.
+`SOLVER_CORPUS/_template/` gives a new port (RK/RT/CS) the harness shape to
+start from, so each doesn't rediscover what RZ's second pass already
+worked out.
+
 **Next, in priority order:**
 
 1. **Compact index-pointer storage (technique 1).** The one canonical 2016-17

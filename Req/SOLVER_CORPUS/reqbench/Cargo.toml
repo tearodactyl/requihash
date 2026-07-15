@@ -1,0 +1,12 @@
+[package]
+name = "reqbench"
+version = "0.1.0"
+edition = "2021"
+description = "Shared, dependency-free measurement harness (timing statistics, memory cross-check, provenance stamping, baseline comparison) for Req/rust and Req/SOLVER_CORPUS/* ports. See Req/BENCH.md."
+publish = false
+
+[lib]
+name = "reqbench"
+path = "src/lib.rs"
+
+[dependencies]

@@ -315,8 +315,17 @@ same counting-global-allocator pattern as `Req/rust/src/bin/req_memcheck.rs`,
 plus `std::time::Instant`, run against the same 3 nonces `tests/cross_check.rs`
 already validates.
 
-**Measured** (Apple Silicon, `--release`, one run per nonce, same input
-used throughout this file):
+**Upgraded since the numbers below were first measured**: `rz_bench.rs`
+now runs on the shared `reqbench` crate (`../reqbench/`, `Req/BENCH.md`) —
+7 repeated trials per nonce (min/median/MAD, not one sample), git
+commit/dirty-tree provenance stamped per run, and the OS-RSS memory
+cross-check performed automatically every run instead of the one manual
+check below. The table's numbers themselves (single-sample, from the
+original harness) are kept as the historical first measurement, not
+re-taken here — re-run `rz_bench` for a current, repeated-trial figure.
+
+**Originally measured** (Apple Silicon, `--release`, one run per nonce,
+same input used throughout this file):
 
 | nonce | solutions | wall time | peak memory (counting allocator) |
 |---|---|---|---|

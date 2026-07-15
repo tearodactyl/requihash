@@ -1,27 +1,28 @@
-//! Measures `solve_144_4`'s wall time (repeated trials, min/median/MAD) and
-//! peak memory (counting allocator, cross-checked against OS RSS), stamped
-//! with git provenance — via the shared `reqbench` crate
-//! (`Req/SOLVER_CORPUS/reqbench/`). See `Req/BENCH.md` for the discipline
-//! this implements and why.
+//! Template: measures a port's solve/verify function under the shared
+//! `reqbench` discipline (repeated trials, provenance, memory cross-check).
+//! Copy to `src/bin/<port>_bench.rs`, rename the crate import and the
+//! `solve_under_test` call, adjust `cases()` to this port's real
+//! parameters/inputs. See `../../rz/src/bin/rz_bench.rs` for a filled-in
+//! example and `Req/BENCH.md` for why each piece exists.
 //!
-//! This replaces an earlier single-sample version of this binary that
-//! reported one wall-clock number per nonce with no repeated trials, no
-//! provenance stamping, and a memory cross-check done once by hand rather
-//! than as a standing part of the tool's own output.
-//!
-//! Run with: cargo run --release --bin rz_bench
-//!            cargo run --release --bin rz_bench -- --baseline baselines/apple-silicon.jsonl --tag apple-silicon
-//!            cargo run --release --bin rz_bench -- --json baselines/apple-silicon.jsonl --tag apple-silicon
+//! Run with: cargo run --release --bin <port>_bench
+//!            cargo run --release --bin <port>_bench -- --json baselines/<tag>.jsonl --tag <tag>
+//!            cargo run --release --bin <port>_bench -- --baseline baselines/<tag>.jsonl --tag <tag>
 
 use reqbench::mem::{cross_check, CountingAlloc, MemCrossCheck};
 use reqbench::provenance::Provenance;
 use reqbench::stats::{compare, load_baseline, Record, Verdict};
 use reqbench::{sample, DEFAULT_REPS, DEFAULT_WARMUP_MS};
-use rz::solve_144_4 as solve_under_test;
 use std::io::Write as _;
 
 #[global_allocator]
 static ALLOC: CountingAlloc = CountingAlloc::new();
+
+// TODO: replace with this port's own solve/verify entry point, e.g.:
+//   use your_port::solve_under_test;
+fn solve_under_test(_input: &[u8], _nonce: &[u8]) -> Vec<Vec<u32>> {
+    unimplemented!("TODO: wire up this port's real solve/verify function")
+}
 
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -34,30 +35,16 @@ struct Case {
 }
 
 fn cases() -> Vec<Case> {
-    // Same input/nonces used throughout STATUS.md and tests/cross_check.rs,
-    // so these numbers are directly comparable to what's already been
-    // checked for correctness (Req/BENCH.md §5: window/parameter identity
-    // must travel with every number).
-    let input: Vec<u8> = (0..64).map(|i| (i % 16) as u8).collect();
-    let mut nonce_2a = [0u8; 28];
-    nonce_2a[27] = 0x2a;
-    vec![
-        Case {
-            label: "nonce_zero",
-            input: input.clone(),
-            nonce: vec![0u8; 28],
-        },
-        Case {
-            label: "nonce_0x01",
-            input: input.clone(),
-            nonce: vec![0x01u8; 28],
-        },
-        Case {
-            label: "nonce_0x2a_tail",
-            input,
-            nonce: nonce_2a.to_vec(),
-        },
-    ]
+    // TODO: replace with this port's own validated (input, nonce) pairs —
+    // ideally the same ones already exercised by tests/cross_check.rs, so
+    // bench numbers are directly comparable to what's already proven
+    // correct (Req/BENCH.md §5: parameter/window identity must travel
+    // with every number).
+    vec![Case {
+        label: "TODO_case_label",
+        input: vec![0u8; 64],
+        nonce: vec![0u8; 28],
+    }]
 }
 
 fn main() {
@@ -86,8 +73,9 @@ fn main() {
         .unwrap_or(DEFAULT_REPS);
 
     let prov = Provenance::capture();
+    // TODO: replace "TODO_port_name" with this port's real binary name.
     println!(
-        "rz_bench: solve_144_4 -- git={} ({}) profile={} arch={}\n",
+        "TODO_port_name_bench: git={} ({}) profile={} arch={}\n",
         prov.git_rev,
         if prov.git_dirty { "dirty" } else { "clean" },
         prov.profile,
@@ -109,16 +97,16 @@ fn main() {
     let mut json_lines: Vec<String> = Vec::new();
 
     for case in cases() {
-        // Timing: repeated trials, not a single sample (Req/BENCH.md §2).
         let timing_samples = sample(reps, DEFAULT_WARMUP_MS, || {
             let sols = solve_under_test(&case.input, &case.nonce);
             std::hint::black_box(&sols);
         });
-        let key = format!("solve_144_4/{}", case.label);
+        // TODO: replace with this port's own key naming — state the real
+        // parameter identity explicitly (e.g. "solve@(WN=..,WK=..,RESTBITS=..)"
+        // or "solve@(n=..,k=..)"), not a bare ambiguous number.
+        let key = format!("TODO_solve/{}", case.label);
         let rec = Record::from_samples(&key, 1, &timing_samples);
 
-        // Memory: counting allocator peak, cross-checked against OS RSS
-        // (Req/BENCH.md §4) -- one solve, isolated (reset just before).
         ALLOC.reset();
         let sols = solve_under_test(&case.input, &case.nonce);
         let peak = ALLOC.peak_bytes() as u64;
@@ -138,23 +126,17 @@ fn main() {
                 allocator_bytes,
                 rss_bytes,
             } => println!(
-                "    peak mem: {} (allocator) / {} (OS RSS) -- agree",
-                human(allocator_bytes),
-                human(rss_bytes)
+                "    peak mem: {allocator_bytes} B (allocator) / {rss_bytes} B (OS RSS) -- agree"
             ),
             MemCrossCheck::Disagree {
                 allocator_bytes,
                 rss_bytes,
                 diff_pct,
             } => println!(
-                "    peak mem: {} (allocator) / {} (OS RSS) -- DISAGREE by {:.1}%, investigate before trusting either",
-                human(allocator_bytes),
-                human(rss_bytes),
-                diff_pct
+                "    peak mem: {allocator_bytes} B (allocator) / {rss_bytes} B (OS RSS) -- DISAGREE by {diff_pct:.1}%, investigate before trusting either"
             ),
             MemCrossCheck::RssUnavailable { allocator_bytes } => println!(
-                "    peak mem: {} (allocator only -- OS RSS cross-check unavailable on this platform, uncorroborated)",
-                human(allocator_bytes)
+                "    peak mem: {allocator_bytes} B (allocator only -- OS RSS cross-check unavailable)"
             ),
         }
 
@@ -183,15 +165,4 @@ fn main() {
         }
         eprintln!("appended {} record(s) to {path}", json_lines.len());
     }
-}
-
-fn human(b: u64) -> String {
-    let units = ["B", "KB", "MB", "GB"];
-    let mut v = b as f64;
-    let mut i = 0;
-    while v >= 1024.0 && i < units.len() - 1 {
-        v /= 1024.0;
-        i += 1;
-    }
-    format!("{:.2} {}", v, units[i])
 }

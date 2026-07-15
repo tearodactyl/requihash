@@ -39,6 +39,7 @@ Status legend: **Done** (merged/measured, artifact cited) · **In progress**
 | A18 | Complete verified commit-level history of `tromp/equihash` (143 commits) plus zcashd/librustzcash integration chain | **Done** | `~/Work/ZK/Requihash/SOLVERS.md`. One item flagged for the project owner (a GitHub identity match), unresolved — `SOLVERS.md` §4 |
 | A19 | Close the validation gap between real zcashd byte output and this repo's own `expand_array`/`compress_array` reimplementations — `SPEC.md` §4.2/§8.1 currently state "written to be interoperable, byte-accurate," not "verified," because the only real Zcash KATs pulled so far (A14) are `keying=single`, which this engine doesn't implement | **Not started** | Needs either (a) implementing `keying=single` first so A14's existing vectors become usable end-to-end, or (b) a smaller standalone check: run zcashd's actual `ExpandArray`/`CompressArray` (or the pinned `equihash` crate's `expand_array`/`compress_array` in `minimal.rs`, same byte layout) against this repo's `rust/src/lib.rs::expand_array`/`get_minimal_from_indices` on the same raw bytes, independent of full solve/verify. (b) is the faster path to closing this specific gap without waiting on `keying=single` |
 | A20 | `scripts/equihash_formulas.py`'s `SWEEP_POINTS` table is out of sync with `SIZING.md`'s actual current sweep — the script still has the pre-expansion point set (missing 96/120/144 for k=5, 128/192 for k=7, 160/200 for k=9; still includes the removed k=9 n=360 point) | **Not started** | `scripts/equihash_formulas.py` `SWEEP_POINTS` dict needs updating to match `SIZING.md` §2's table exactly, or the script's own output should be treated as the source of truth and `SIZING.md` regenerated from it — pick one direction, don't let the two drift independently again |
+| A21 | Shared measurement discipline (`reqbench` crate) for `SOLVER_CORPUS` ports — motivated by HECpoc's `Bench.md` (provenance/canonical-evidence discipline) and ZeroPerf's `Perf.md` (cross-checking every number against a second instrument, exact window/parameter reporting) reviewed and applied here; RZ's first bench pass had none of this (single-sample timing, no git provenance, one manual memory cross-check) | **Done** | `BENCH.md` (the spec), `SOLVER_CORPUS/reqbench/` (the crate — statistics, provenance stamping, memory cross-check), `SOLVER_CORPUS/rz/src/bin/rz_bench.rs` (migrated, now 7-rep min/median/MAD + provenance + automated RSS cross-check), `SOLVER_CORPUS/_template/` (skeleton for RK/RT/CS). `Req/rust`'s own `report.rs` stays a separate, intentionally-uncoupled sibling implementation — see `ARCHITECTURE.md` §8 for why |
 
 ## Current direction: quality, concurrency, and sizing over hash-vs-hash
 
@@ -249,10 +250,33 @@ on.
 
 ## Group D — comparative solver corpus
 
-Moved to `SOLVER_CORPUS.md` (RK, RZ, RT, CS: standalone solver/verifier
-ports for expertise and cross-implementation measurement) — see that
-document for task specs, parameter ranges, validation plans, and kickoff
-prompts.
+Full task specs, parameter ranges, validation plans, and kickoff prompts:
+`SOLVER_CORPUS.md`. Status below, verified directly against
+`SOLVER_CORPUS/` on disk, not assumed from prior notes.
+
+| Port | Status | Detail |
+|---|---|---|
+| RZ | **Done** — the only one of four actually finished | Native Rust port of the vendored, single-core-stripped `equi_miner.c` at `(WN=144, WK=5, RESTBITS=4)` = Equihash(144,5). Cross-checks byte-identical against the C original across 3 nonces (`tests/cross_check.rs`, both debug and release). Now on the shared `reqbench` measurement harness (A21): 7-rep min/median/MAD timing, git-provenance-stamped, peak memory (6.27 GB) cross-checked against OS RSS and agreeing. `(200,8)`/`(200,9)` explicitly out of scope for this pass — a deliberate, stated deferral, not a gap |
+| RK | **Not started** — zero code on disk | Khovratovich's original C++ reference solver, parameter-generic (broader range than RT by construction — no compile-time `(n,k)` restriction). An earlier attempt to build this in parallel with RZ/RT was aborted (see "History" below) with nothing committed; needs a fresh start, smallest-parameter-first |
+| RT | **Not started** — zero code on disk; genuinely blocked, not just unattempted | Tromp's full multi-core `equi_miner.h`/`equi_miner.cpp` (real `pthread_barrier_t` round sync, `-t <nthreads>`). Blocked on `blake2-avx2/blake2bip.h` — real x86 AVX2 intrinsics with no ARM equivalent, so it will not build natively on this Apple Silicon machine. An in-place fix (e.g. RZ's own BLAKE2b-glue substitution trick) has not been tried yet; a Linux/x86_64 VM was proposed once and explicitly not approved (`feedback-agent-dispatch-discipline` memory: no VM without a clear stated reason and explicit go-ahead) |
+| CS | **Not started** — zero code on disk | C++ port of the paper's own Python "Sequihash" k-list reference (`k_list_algorithm.py`). Two load-bearing convention differences from this project's own code (list-count `k` not tree-depth; ASCII `f"{i}-{j}"` leaf encoding not binary `le32`) must be preserved exactly, not silently translated — `SOLVER_CORPUS.md`'s own CS section states both explicitly |
+
+**History, for context on why RK/RT stayed at zero for two sessions
+running:** RK, RZ, and RT were originally launched as three parallel
+background agents, each targeting a hard parameter tier including
+`(200,9)`, with no prior confirmation the build environment could even
+compile the C/C++ references on this machine. All three had to be killed
+mid-run — RT hit the AVX2 blocker above with no fallback tried; RK hung
+debugging a `(200,9)` vector-generation subprocess with nothing
+checkpointed; RZ alone had partial, real progress (a working C
+cross-check harness) but no Rust code yet. The corrected approach —
+smallest parameter first, continuous `STATUS.md` checkpointing, no VM
+without explicit approval, debug in place rather than reaching for new
+environments — is what RZ's second, successful pass followed, and is now
+the standing discipline (`feedback-agent-dispatch-discipline` memory,
+`SOLVER_CORPUS.md`'s cross-cutting requirements). RK and RT should restart
+under that same discipline, not resume from where the aborted attempt left
+off.
 
 ## Cross-track sequencing note
 

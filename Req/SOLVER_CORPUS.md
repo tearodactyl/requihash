@@ -34,6 +34,26 @@ covers it in depth.
   What each task's "byte-exact"/"validation" requirements bind you to is
   *output* equality (index sets, encodings, as specified per task) — not
   structural mimicry of the source's internal shape.
+- **Every port includes a measurement harness on the shared `reqbench`
+  discipline** (`Req/BENCH.md`, `Req/SOLVER_CORPUS/reqbench/`) as part of
+  its own done-criteria, not an optional extra: repeated-trial timing
+  (min/median/MAD, not single samples), git-provenance-stamped output, and
+  — where the port measures memory at all — a peak-memory figure
+  cross-checked against OS RSS, not trusted from one instrument alone.
+  Start from `Req/SOLVER_CORPUS/_template/` (a generic skeleton) rather
+  than reimplementing this per port; `rz/src/bin/rz_bench.rs` is the
+  filled-in reference example. This exists because RZ's own bench harness
+  was built ad hoc, single-sample, with no provenance, in an earlier pass
+  — later found and fixed, but a later port starting from the template
+  shouldn't repeat that gap.
+- **Build/Cargo topology**: there is no workspace under `Req/` — every
+  port is a standalone crate, built with plain `cargo` commands from
+  inside its own directory (`cd SOLVER_CORPUS/<port> && cargo test`), never
+  a sweep from `Req/`'s root. `Req/README.md`'s "Rust/Cargo topology"
+  section is the canonical explanation (why no workspace, the exact
+  path-dependency shape, expected usage) — read it before adding a new
+  port's `Cargo.toml`, since a new port depending on `reqbench` must use
+  the same relative-path pattern `rz/` does.
 
 ## References
 

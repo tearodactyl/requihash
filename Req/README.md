@@ -1,9 +1,8 @@
 # Req — Requihash miner and verifier
 
-Reference implementation of Requihash, the regularity-repaired variant of Equihash
+Reference implementation of the regularity-repaired variant of Equihash
 proposed by Tang, Sun, and Gong, "On the Regularity of the Generalized Birthday
-Problem" ([eprint 2025/1351](https://eprint.iacr.org/2025/1351)), Section 5.2.
-Findings context: [../Equihash.md](../Equihash.md), F-A4.
+Problem" [PAPERS.md has summary and references]
 
 Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
 (what's implemented vs. specified-only); [ARCHITECTURE.md](ARCHITECTURE.md) —
@@ -137,6 +136,50 @@ as the concrete regularity binding, documented in `cpp/requihash.h`).
     rust/  : cargo test --manifest-path rust/Cargo.toml
     cross  : cpp/build/req_gen vectors   (writes vectors/*.json)
              cargo run --manifest-path rust/Cargo.toml --bin req_xcheck -- vectors
+
+### Rust/Cargo topology — no workspace, each crate stands alone
+
+There is **no Cargo workspace** anywhere under `Req/` — no top-level
+`Cargo.toml` with a `[workspace]` section, no single `cargo build` that
+sweeps everything. This is deliberate, not an oversight: `SOLVER_CORPUS.md`'s
+own cross-cutting requirement is that each port needs "no other context
+needed from this repository's other documents," and a shared workspace
+would quietly couple every port's dependency resolution and lockfile to
+every other's. Concretely, four independent Rust packages exist today,
+each with its own `Cargo.toml`/`Cargo.lock`/`target/`:
+
+| Crate | Path | Depends on (path deps) |
+|---|---|---|
+| `requihash` | `rust/` | none — only crates.io deps |
+| `reqbench` | `SOLVER_CORPUS/reqbench/` | none — dependency-free by design (`BENCH.md`) |
+| `rz` | `SOLVER_CORPUS/rz/` | `reqbench` (relative path `../reqbench`) |
+| *(future)* `rk`/`rt`/`cs` | `SOLVER_CORPUS/{rk,rt,cs}/` | will depend on `reqbench` the same way `rz` does, per `SOLVER_CORPUS/_template/` |
+
+**Expected usage: `cd` into the crate you want, then plain `cargo`
+commands** — never `--manifest-path` from `Req/`'s own root for anything
+under `SOLVER_CORPUS/` (that flag is only shown above for `rust/`, which
+predates `SOLVER_CORPUS/` and is `Req/README.md`'s own existing
+convention; either form works for a single-crate command, `cd` is just
+less error-prone once path-dependent crates are involved):
+
+    cd Req/SOLVER_CORPUS/reqbench && cargo test
+    cd Req/SOLVER_CORPUS/rz        && cargo test
+    cd Req/SOLVER_CORPUS/rz        && cargo run --release --bin rz_bench -- --json baselines/<tag>.jsonl --tag <tag>
+
+`rz`'s relative path dependency (`../reqbench`) resolves purely from disk
+layout — no workspace file needed for `cargo build`/`cargo test` inside
+`rz/` to find `reqbench` — but it does mean **`reqbench/` and `rz/` must
+stay siblings under `SOLVER_CORPUS/`**; moving one without the other
+breaks the path. `SOLVER_CORPUS/_template/` has **no `Cargo.toml` at
+all**, deliberately, so it can never be built or accidentally swept by any
+future workspace-wide command — copy its contents into a new port
+directory first, then add the `Cargo.toml.snippet` pieces into that port's
+own manifest.
+
+**No workspace is planned.** If ports under `SOLVER_CORPUS/` multiply and
+duplicate build/CI overhead becomes a real cost, revisit this — but do not
+add a workspace preemptively; it works against the standalone-per-port
+design `SOLVER_CORPUS.md` states explicitly.
 
 ## Verified results
 

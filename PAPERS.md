@@ -1,20 +1,29 @@
-# PAPERS.md — unpacked treatment of papers relevant to this project's topics
+# PAPERS.md — definitive citation index for research papers relevant to this project
 
-Full, unpacked (not just cited) treatment of papers directly relevant to
-Equihash/Sequihash/Requihash and a handful of other foundational or
-dominant results — the level of detail `References.md` deliberately
-doesn't carry (that document lists and links once; this one digs in).
-Every entry here is also listed once in `~/Work/ZK/Requihash/References.md`
-under **Author (Year)** format; that document is the citation index other
-docs point back to, this one is where the actual content gets extracted.
-The 2025-dated entries were obtained as PDFs (`~/Downloads/2025-575.pdf`,
-`2025-1351.pdf`, `2025-1456.pdf`, `2025-2141.pdf`) and scanned directly
-(not from secondary summaries), first pass 2026-07-14; titles, authors, and
-venue status for those are transcribed from each PDF's own title page
-and/or the eprint listing metadata, checked live against `eprint.iacr.org`.
-**Ordered most recent first** by publication year, ties broken by eprint
-received date where known (not eprint number, and not latest-revision date
-— a revision updates the same paper, it isn't a new one).
+**The single source of truth for research-paper citations across this
+project.** Sections 1-9 give full, unpacked (not just cited) treatment of
+the nine papers most directly relevant to Equihash/Sequihash/Requihash —
+propositions, exact quotes, tables, page numbers. Section 10 gives shorter,
+formally-linked citations for other research articles in scope (referenced
+in `Equihash.md`'s narrative, or as background the big nine build on)
+without the same depth of unpacking. Other documents in this project —
+`Equihash.md`, `Req/SIZING.md`, `Req/SOLVER_CORPUS.md`, `Req/SPEC.md`,
+`SOLVERS.md`, RZ's own `STATUS.md` — cite research papers by short
+designator (e.g. "Tang, Sun, Gong (2025)") and point back here rather than
+repeating title/venue/link details inline; a document's own References
+section (e.g. `Equihash.md` §9) retains only mentions and links that are
+**not** already listed here — non-paper sites, tools, and repos.
+
+The 2025-dated entries in §1-4 were obtained as PDFs
+(`~/Downloads/2025-575.pdf`, `2025-1351.pdf`, `2025-1456.pdf`,
+`2025-2141.pdf`) and scanned directly (not from secondary summaries), first
+pass 2026-07-14; titles, authors, and venue status for those are
+transcribed from each PDF's own title page and/or the eprint listing
+metadata, checked live against `eprint.iacr.org`. §1-9 are **ordered most
+recent first** by publication year, ties broken by eprint received date
+where known (not eprint number, and not latest-revision date — a revision
+updates the same paper, it isn't a new one); §10 likewise, most recent
+first.
 
 ## 1. Memory Optimizations of Wagner's Algorithm with Applications to Equihash
 
@@ -341,10 +350,67 @@ single-list problem Equihash actually solves (LGBP) is a different,
 looser problem than the regular k-list GBP Wagner's paper defines and
 solves (RGBP) — the √2-factor complexity-exponent gap between the two is
 this project's own primary source's central technical finding. Bernstein
-(2007) and Bernstein et al.'s FSBday (2011), both listed in
-`References.md`, are a direct algorithmic improvement and a real
-implementation of this same paper's attack, respectively — not unpacked
-here since neither is Equihash-specific.
+(2007) and Bernstein et al.'s FSBday (2011), below in §10, are a direct
+algorithmic improvement and a real implementation of this same paper's
+attack, respectively — not unpacked at the same depth as the big nine
+above since neither is Equihash-specific.
+
+## 10. Other research articles in scope
+
+Formal citations for papers this project's documents reference — in
+`Equihash.md`'s §2 timeline, in the propositions/formulas the big nine
+above build on, or in background this project has read directly — that
+aren't among the nine papers unpacked above. Shorter treatment than §1-9
+by design: these are cited because they're relevant context, not because
+this project's own work depends on their specific results the way it
+depends on, say, Tang–Sun–Gong (2025). Ordered by publication year, most
+recent first.
+
+- **Esser & Santini (2024).** "Not Just Regular Decoding: Asymptotics and
+  Improvements of Regular Syndrome Decoding Attacks." CRYPTO 2024.
+  [eprint 2023/1568](https://eprint.iacr.org/2023/1568).
+  Regularity-structured syndrome-decoding attacks — part of the
+  "regularity toolkit and conjecture landscape" (`Equihash.md` §2) the
+  2025 Requihash/Sequihash rework's own regular-vs-loose GBP framing
+  builds on conceptually, though this paper addresses a different
+  underlying problem (syndrome decoding, not GBP).
+- **Dinur, Keller, Klein (2024).** "Fine-Grained Cryptanalysis: Tight
+  Conditional Bounds for Dense k-SUM and k-XOR." Journal of the ACM 71(3),
+  Article 23 (DOI 10.1145/3653014); originally FOCS 2021.
+  [eprint 2021/1460](https://eprint.iacr.org/2021/1460).
+  Proves known k-SUM/k-XOR algorithms are essentially optimal in the dense
+  regime for `k=3,4,5`, and proves the k-tree algorithm's optimality over
+  a limited parameter range for `k>5` — the fine-grained complexity
+  landscape Tang, Sun, Gong (2025, §3 above) situates its own regular/loose
+  GBP complexity-gap result against.
+- **Ren & Devadas (2017).** "Bandwidth Hard Functions for ASIC
+  Resistance." [eprint 2017/225](https://eprint.iacr.org/2017/225).
+  Proposes bandwidth-hardness — ASIC resistance via runtime energy cost
+  when available cache is insufficient — as a distinct hardness style from
+  memory-capacity hardness. Cited in `Equihash.md` §2's comparison table:
+  Autolykos's bandwidth-hardness claim is explicitly scoped by this
+  paper's own theory as capping, not eliminating, ASIC advantage.
+- **Levieil & Fouque (2006).** "An Improved LPN Algorithm." SCN 2006.
+  [paper (author's site)](https://www.di.ens.fr/~fouque/pub/scn06.pdf).
+  Introduces the single-list collision-search technique (their "LF2"
+  method: partition samples sharing a bit-chunk, sum every in-group pair)
+  for the LPN problem — the paper Tang, Ding, Sun, Gong (2025, §1 above)
+  and Tang, Sun, Gong (2025, §3 above) both credit as the origin of the
+  single-chain/single-list algorithm Equihash's design later reused for a
+  different problem (GBP, not LPN) without preserving Wagner's original
+  regularity structure.
+- **Bernstein (2007).** "Better price-performance ratios for generalized
+  birthday attacks." [paper](https://cr.yp.to/papers.html#genbday).
+  Improves the machine-size/time exponents on Wagner's original GBP
+  attack (§9 above) — a direct algorithmic improvement, not an
+  Equihash-specific result.
+- **Bernstein, Lange, Niederhagen, Peters, Schwabe (2011).** "FSBday:
+  Implementing Wagner's generalized birthday attack against the SHA-3
+  round-1 candidate FSB." [paper](https://cr.yp.to/papers.html#fsbday).
+  A real, executed implementation of Wagner's GBP attack (§9 above)
+  against an actual SHA-3 candidate — a concrete "naive formula vs. real
+  achievable footprint" precedent outside the Equihash/Sequihash line,
+  also cited in `Req/SIZING.md` §0a.
 
 ## Cross-paper notes
 

@@ -19,6 +19,7 @@ path = "src/bin/rz_bench.rs"
 
 [dependencies]
 blake2b_simd = { version = "1", default-features = false }
+reqbench = { path = "../reqbench" }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

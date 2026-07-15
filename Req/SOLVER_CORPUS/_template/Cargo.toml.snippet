@@ -1,0 +1,9 @@
+# Merge into the port's own Cargo.toml — not a full manifest on its own.
+
+# Add to [dependencies]:
+reqbench = { path = "../reqbench" }
+
+# Add a [[bin]] entry (adjust name/path to match the renamed bench file):
+# [[bin]]
+# name = "<port>_bench"
+# path = "src/bin/<port>_bench.rs"

@@ -16,6 +16,18 @@ Measured on Apple Silicon (aarch64), scalar reference backend, `--release`
 Evidence grade: Measured (harness committed as `rust/src/bin/req_bench.rs`,
 `req_profile.rs`; statistics and comparison rules in `rust/src/report.rs`).
 
+**`report.rs`'s statistics/provenance/comparison design has since been
+extracted, generalized, and extended into a standalone crate,
+`SOLVER_CORPUS/reqbench/`** (`Req/BENCH.md`, `ARCHITECTURE.md` §8) — used
+by every `SOLVER_CORPUS` port (RZ today; RK/RT/CS as they're built) so each
+doesn't reinvent this discipline per port. `report.rs` here in `Req/rust`
+stays its own, intentionally separate implementation rather than being
+retrofitted onto `reqbench` — `Req/rust` has no dependency on
+`SOLVER_CORPUS/`, by design. The two share a common statistical method
+(min/median/MAD, the same regression band rule) but are not the same code;
+if the two drift in behavior, treat that as expected, not a bug, unless a
+specific inconsistency is found worth reconciling.
+
 **Regression workflow** (the §8 gap-3 discipline, implemented): every bench
 emits a JSON-lines record (min/median/MAD over warm reps; warm-up by time
 budget so microbenches get scheduled and ramped before sampling). A baseline
