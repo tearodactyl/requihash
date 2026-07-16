@@ -351,7 +351,7 @@ at R = 0.83, marginal).
 the `blake3` crate's build script enables its NEON C intrinsics
 automatically on any aarch64 target (`is_aarch64() && is_little_endian()`,
 no feature flag). BLAKE2b has a comparable NEON implementation too — the
-official `BLAKE2/BLAKE2` repo ships a maintained `neon/blake2b-neon.c` (judged **premature to pursue** — A13 demoted to icebox, full analysis `BLAKE/BLAKE.md` §5.2: BLAKE2b's 64-bit words are NEON-hostile and hashing is a minor cost share) with
+official `BLAKE2/BLAKE2` repo ships a maintained `neon/blake2b-neon.c` (icebox — optimization-stage work this program is not at yet; `BLAKE/BLAKE.md` §5.2, PLAN A13) with
 a dedicated aarch64 makefile (local clone:
 `~/Work/ZK/ZKs/BLAKE/blake2-reference`) — but no published Rust crate wraps it
 the way `blake3` wraps its own; the gap is packaging, not the existence of

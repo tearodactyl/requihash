@@ -18,8 +18,35 @@ authors' portable reference (`ref/blake2b-ref.c`), vendored at
 license in `PROVENANCE.md` there), referenced **repo-relative only** —
 no `$HOME`-absolute paths in any build file (an override variable
 exists per consumer for exceptional cases: `RZ_BLAKE2_REF_DIR`,
-`-DBLAKE2_REF_DIR`). **Canonical BLAKE2b for Rust consumers:
-`blake2b_simd`** (§4.4).
+`-DBLAKE2_REF_DIR`). **Uniform implementation across use cases (requirements-first,
+2026-07-16)**: the requirements are BLAKE2b with the full parameter
+block (`personal`), streaming with a cheaply copyable state (the
+midstate pattern), portability across Linux/macOS/Windows on
+arm64/x86_64, single provenance and auditability, and acceleration
+added later *to the same implementation* via runtime dispatch (§5.4) —
+never by swapping libraries. One implementation satisfies all of it:
+the vendored reference — for C/C++, which consume it directly. For
+Rust, applying the project's own change criterion (an incumbent stays
+unless a challenger is clearly superior in tight code, performance, or
+compatibility) resolves it the other way: **`Req/rust`'s bundled
+single-file scalar (`src/blake2b.rs`, 153 lines) stays as the Rust
+reference hasher.** It is a complete, clean parameter-block
+implementation — zero dependencies, zero `unsafe`, no build script,
+correct 128-bit length counter, plain-copy `Clone` for the midstate
+pattern — auditable in one sitting and portable everywhere cargo goes,
+including targets with no C toolchain. No challenger beats it on the
+criterion: `blake2ref` adds FFI + a `cc` build dependency for equal
+bulk throughput, and `blake2b_simd` adds ~4,200 third-party lines whose
+payoff (runtime AVX2/SSE4.1, `many` batching) exists only on x86.
+So uniformity here means *one specification, minimal cross-validated
+implementations*: the vendored C for C/C++, the single audited Rust
+file for Rust — with **[vendor/blake2-rs/](vendor/blake2-rs/)
+(`blake2ref`)** kept as the by-construction cross-language consistency
+artifact (bound to the exact vendored object code; validated against
+the published "abc" vector, CPython `hashlib` personalization vectors,
+and `blake2b_simd`; available to any future consumer that genuinely
+needs C-object parity). `blake2b_simd` is a *measured x86-acceleration
+candidate at Seam A* — nothing more. No Seam A rewiring is planned.
 
 Alternatives considered and rejected as the canonical C/C++ choice:
 
@@ -32,21 +59,39 @@ Alternatives considered and rejected as the canonical C/C++ choice:
 | 2016 vendored snapshots (Khovratovich/tromp bundles) | don't compile on current toolchains (§6); superseded by this decision |
 | BLAKE3 | a different hash — remains a Seam A *candidate*, not a BLAKE2b substitute |
 
-**Interaction with the tromp codebase: none needed at the BLAKE2b level
-anymore.** tromp's `equi_miner` builds **natively on arm64 as straight
-portable C++** by pointing the include path at the modern reference
-header (an include-directory shim mapping `blake/blake2.h` → the
-vendored `blake2.h`) and linking `blake2b-ref.c` — verified 2026-07-16:
-the native arm64 binary reproduces the true x86 SSE original's solve
-trace exactly, thread-count-invariant (`Req/SOLVER_CORPUS.md` RT
-section). This works because tromp's modified state layout is an
-internal optimization, not a wire format: his variant produces standard
-BLAKE2b digests (the cross-compiled SSE original matches the published
-BLAKE2b-512("abc") vector). Consequences: **Rosetta/x86 emulation is
-demoted** to an optional second oracle, not a build strategy; the
-previous packed-struct header patch and the portable-glue patch set are
-retired (superseded by, respectively, the include-shim and
-`Req/SOLVER_CORPUS/rk/original/`).
+**Interaction with the tromp codebase: none needed at the BLAKE2b
+level.** tromp's `equi_miner` builds **natively as straight portable
+C++** against the vendored modern header and `blake2b-ref.c` — verified:
+solve trace identical to the upstream x86 build, thread-count-invariant
+(`Req/SOLVER_CORPUS.md` RT section). His modified state layout is an
+internal optimization, not a wire format: it produces standard BLAKE2b
+digests, so the standard layout drops in via the header alone.
+
+**Shim/adapter policy**: committed work codes directly to the modern
+distribution — no shims. An include-directory shim (mapping
+`blake/blake2.h` → the vendored header) is permitted only as an
+*evaluation* tool for running pristine upstream sources unmodified;
+any port forks and codes to the vendored header directly, as
+`rk/original` does. The one standing adapter is RZ's glue, which is not
+a workaround: it *implements a required opaque interface* that the
+pinned `equihash` crate's vendored C defines (§3.2), and RZ's whole
+purpose is byte-fidelity to that exact crate.
+
+**Scope of the pinned `equihash` crate (provenance and allowed roles)**:
+published by Jack Grigg (Electric Coin Company) from
+`zcash/librustzcash` (`components/equihash`, MIT OR Apache-2.0);
+version history 0.1.0 (2020) → 0.2.x (2022–2025) → **0.3.0
+(2026-04-24, the newest published release)**. It reaches this machine
+through Zebro's `Cargo.lock` (zebrad → zebra-chain → `equihash`), and
+zebra HEAD still depends on it. So the *crate* is current; what is
+genuinely old is by upstream design: the C solver vendored **inside**
+it is zcashd's copy of tromp's code frozen at `690fc5eff` (2016),
+deliberately never resynced (consensus artifact), single-core-stripped
+in 2024. Allowed roles here — all *oracle*, never design input: RZ's
+fidelity target (matching that exact C is RZ's purpose), A19's
+bit-packing test oracle, A14's KAT source (already extracted to static
+vectors). It imposes no constraint on this program's own
+implementations.
 
 ## 1. The family
 
@@ -161,7 +206,15 @@ forfeited.) Header files do declare parameter types — the compiler
 checks *call sites against the declaration it sees* — but nothing
 checks the declaration against the *definition* in another translation
 unit. The robust fix is coding directly to the modern order
-(`rk/original` does); a shim only relocates the hazard.
+(`rk/original` does); a shim only relocates the hazard. Headers *do*
+carry full parameter types, and within one lineage that protects you:
+with the modern header included, a 2016-order call such as
+`blake2b(buf, &input, NULL, …)` fails to compile (`&input` lands on the
+`size_t outlen` parameter) — which is exactly how `rk/original`'s two
+call sites were caught by the compiler rather than at runtime. The
+silent-corruption case is specifically *mixed lineages*: code compiled
+against one lineage's header, linked against the other lineage's object
+file.
 
 ### 3.4 Personalization — the deep dive
 
@@ -230,20 +283,45 @@ salt/personal — not Equihash-capable (§3.4).
   **runtime detection**; `many::hash_many` batch API. Features:
   `std` (default), `uninline_portable` — i.e., no configuration needed
   for correctness or dispatch. Pinned here: 1.0.4 (`Req/rust`), 1.0.2
-  (inside the pinned `equihash` crate). **How it earns its keep** (§0's
-  Rust-side pick): (1) full parameter block including `personal` via
-  builder `Params` — Equihash-capable where RustCrypto's `blake2`
-  historically made personalization awkward; (2) `hash_many` is
-  exactly the many-independent-short-messages shape of Equihash leaf
-  generation, with runtime-dispatched SIMD — the maintained, standard
-  equivalent of what tromp hand-built as `blake2bip` (§5.3); (3)
-  already the ecosystem's converged choice: zcashd (2020 rewiring),
-  librustzcash/`equihash` crate, zebra — so Zebro inherits it with
-  zero decisions; (4) same author as official BLAKE3, actively
-  maintained, no `unsafe` C FFI.
+  (inside the pinned `equihash` crate). **Why it is the accelerated
+  tier here** — technical merits only: (1) full parameter block
+  including `personal` via builder `Params`; (2) `hash_many` is exactly
+  the many-independent-short-messages shape of Equihash leaf
+  generation, with runtime-dispatched SIMD — the maintained equivalent
+  of what tromp hand-built as `blake2bip` (§5.3); (3) pure Rust, no FFI
+  or build coupling. That zcashd, librustzcash, and zebra also wrap it
+  (zebra via the pinned `equihash` crate, at 1.0.2) is **inheritance,
+  not adoption evidence**, and carries no weight in this decision —
+  this project treats every backend as a measured candidate
+  (`Req/ARCHITECTURE.md` §1a), and Zebro inheriting zebra's choice is
+  precisely the kind of default this program exists to re-examine.
+  **Why not wrap the vendored `blake2b-ref.c` for Rust instead?** A
+  real alternative with one strong property — byte-provenance-by-
+  construction, the same C object code across every language — at the
+  cost of `unsafe` FFI, a `cc` build dependency, and no batching. This
+  repository currently gets equivalent assurance differently:
+  `Req/rust`'s own scalar is KAT-gated and cross-validated
+  byte-for-byte against the C++ side, and `blake2b_simd` must pass a
+  runtime self-test against that scalar before autodetection adopts it.
+  The FFI wrap stays on the table as the documented fallback if
+  construction-level identity is ever demanded (e.g., a consensus audit
+  requirement).
 - **`blake2`** (RustCrypto): independent pure-Rust from spec,
-  `Digest`-trait-shaped. Not used anywhere in this program (not even in
-  the cargo cache) — listed for orientation only.
+  `Digest`/`Mac`-trait-shaped; the ecosystem's most-used BLAKE2 crate
+  (136M downloads vs. `blake2b_simd`'s 51M as of 2026-07), actively
+  maintained (0.10.x stable; 0.11.0-rc series through 2026).
+  **Personalization is supported** (verified in 0.10.6 source:
+  `new_with_salt_and_personal(key, salt, persona)` on the `*Var` types)
+  — so it is Equihash-capable. Its `simd`/`simd_opt`/`simd_asm`
+  features are the legacy nightly-era lineage, off by default and not
+  runtime-dispatched; effectively portable in practice, no batch API.
+  Evaluated and passed over for the seam on the change criterion: a
+  dependency with trait machinery and some `unsafe` (byte-cast
+  helpers), delivering nothing beyond the zero-dependency 153-line
+  bundled scalar. The right default for a general Rust application; not
+  needed here.
+- **`blake2-rfc`**: the pre-2018 de-facto standard (13.7M downloads),
+  unmaintained since 2017-11 — historical only, do not adopt.
 - **`blake3`** (official, BLAKE3 team): Rust + vendored C/asm kernels
   via `build.rs`, runtime dispatch; has a `neon` feature (plus
   `no_neon`/`no_avx2`/… opt-outs) — NEON is real and default-detected
@@ -271,19 +349,38 @@ Rust-backed).
 | GPU / CUDA (SILENTARMY, nheqminer kernels, tromp's `eqcuda`) | thousands of leaf hashes + the whole Wagner sort/merge on-device | orders of magnitude on *throughput* | only pays at miner scale; PCIe latency and kernel-launch overhead swamp single-solve use; the real win historically was GPU-resident *sorting*, not just hashing |
 | Multicore | parallelize across nonces (embarrassingly parallel) or across buckets within a solve (tromp's `pthread_barrier` rounds; Req Q1's rayon plan) | near-linear across nonces | orthogonal to and composable with all of the above |
 
-### 5.2 What this means here (Amdahl, with our own numbers)
+### 5.2 What this means here, and the NEON picture
 
 `Req/BENCHMARK.md`: hashing is ~17% of solve time at small parameters —
-the merge dominates. So SIMD hashing is capped at ~1.2x whole-solve
-until the merge is parallelized/optimized; batching+SIMD matters much
-more at (200,9)-scale generation (2M leaves) and for miner throughput.
-**Verdict on the NEON mention in BENCHMARK §9 / PLAN A13: yes,
-premature.** BLAKE2b-on-NEON is intrinsically weak (2 lanes, emulated
-rotates, slower-than-scalar reports), `blake2b_simd`'s portable path is
-already fine on ARM, hashing is 17% of the pie, and no consumer demands
-it. A13 is demoted to icebox accordingly (`Req/PLAN.md`); if ARM hash
-throughput ever matters, the better lever is BLAKE3 (real NEON) or
-batching, not a BLAKE2b NEON port.
+the merge dominates — so any hash-side SIMD win is capped near 1.2x
+whole-solve until the merge itself is addressed. Batching+SIMD matters
+at (200,9)-scale generation and miner throughput.
+
+**A13 (BLAKE2b NEON backend) is icebox for one primary reason: this
+program is not at the optimization stage.** The current stage is
+correctness, reference implementations, and measurement infrastructure
+(A5/A6, the RT port); SIMD backend work — NEON included — is sequenced
+after the measurements that would justify it, not before.
+
+Technical notes for when that stage arrives. **Known BLAKE2 NEON
+implementations**: the official package's `neon/` directory
+(`blake2b-neon.c` + load headers, Neves lineage — ARMv7 and AArch64)
+and Crypto++'s BLAKE2 NEON path (Walton/Neves); BLAKE3's NEON kernel
+ships in its official implementations (a different hash, listed for
+contrast); libsodium and OpenSSL carry none. **Why AArch64 headroom is
+modest, and why the implementations exist anyway**: BLAKE2b's state is
+4×4 u64, so 128-bit NEON registers hold 2 lanes; the 16/24-bit
+rotations vectorize cheaply (`tbl`/`ext`, analogous to SSSE3
+`pshufb`) but the diagonalization shuffles cost extra — while AArch64
+*scalar* is already strong (single-instruction `ror` on 64-bit GPRs,
+31 general registers). The NEON ports were written when the target was
+32-bit ARMv7, where scalar 64-bit arithmetic is genuinely expensive and
+NEON was a clear win; on AArch64 the published experience is mixed,
+including slower-than-scalar reports on some cores. Implementations
+exist for good historical reasons; the marginal-on-AArch64 expectation
+is a measurement question for the optimization stage (measure the
+package's `neon/` and a 2-way interleaved batch against
+`blake2b_simd`'s portable path and against BLAKE3, on the A5 harness).
 
 ### 5.3 Why tromp changed the struct and API, and the standard way now
 
@@ -308,12 +405,43 @@ struct). The batching is `blake2b_simd::many::hash_many` (Rust,
 runtime-dispatched, maintained) or Neves' own experimental
 `blake2-avx2` repo (C); BLAKE3 gets batching + tree parallelism natively.
 
+**"If miners like it, why not us?" — we will, at the right stage.**
+The compact state and midstate batching are real wins, and miners keep
+them for good reason: the per-leaf state copy is the hot operation at
+miner scale, and a smaller state plus interleaved finalization is worth
+real percentage points. "Behaviorally equivalent" (§0) means *safe to
+defer*, not unimportant — these techniques change performance, never
+digests. This program's sequence: correctness and measurement first
+(A5 counting harness, A6 index-pointer backend, the RT port), then
+adopt the miner techniques deliberately where measurements justify
+them — copy-cheap midstate state, `hash_many`-style batching, and
+runtime dispatch (§5.4) are the shortlist.
+
+### 5.4 Adding runtime detection/dispatch to the vendored distribution
+
+The package's own selection is compile-time only (§2). When the
+optimization stage wants one binary using SSE/AVX2 or NEON where
+present: compile each compression variant as its own translation unit
+with distinct symbols (`blake2b_compress_ref/_sse41/_avx2/_neon`), plus
+a once-run initializer that probes the CPU — `cpuid` on x86,
+`getauxval(AT_HWCAP)` on Linux/ARM32, `sysctlbyname` on macOS (AArch64
+NEON is architecturally guaranteed, no probe needed) — and installs a
+function pointer that the streaming API calls through. Three copyable
+precedents: libb2's `--enable-fat`, libsodium's `cpu_features` picker,
+BLAKE3's `blake3_dispatch.c`. **BLAKE3 needs nothing added**: its
+official C and Rust already ship runtime x86 dispatch, and NEON is
+compiled in on AArch64 (universal there; 32-bit ARM would need the
+`getauxval` probe). Cost: one indirect call per compress or batch —
+amortized invisible. Not scheduled — optimization-stage work, behind
+the same self-test-gate discipline as `Req/rust`'s `simd` seam.
+
+
 ## 6. The 2016 vendored snapshots, and what breaks on current toolchains
 
 | Copy | Lineage | Current status |
 |---|---|---|
 | `equihash-khovratovich/.../blake/` | package `sse/` verbatim (Neves, CC0) | ✗ unbuildable as-is; **superseded by the portable fork `Req/SOLVER_CORPUS/rk/original/`** (C++14, vendor BLAKE2b, modern arg order; regenerates all 8 vectors byte-identically) |
-| `equihash-tromp/blake/` | package `sse/`, state compacted (§5.3) | ✗ unbuildable as-is; **superseded by the include-shim native build** (§0): point `blake/blake2.h` at the vendored modern header, link `blake2b-ref.c` — builds and matches on arm64 directly |
+| `equihash-tromp/blake/` | package `sse/`, state compacted (§5.3) | ✗ unbuildable as-is; builds natively against the vendored modern header (§0) — pristine-source evaluation via include-shim only; RT's port forks to the vendored header directly |
 | `equihash-tromp/blake2-avx2/`, `blake2-asm/` | Neves AVX2 technique adapted; xenoncat's asm | x86-only by nature; not needed for any current use (batching story: §5.3) |
 | `equihash-0.3.0/tromp/blake2b.h` (pinned crate) | opaque 5-function miner API | ✓ bridged by RZ's glue (§3.2) to the vendored reference |
 | `Req/cpp/blake2b.h`, `Req/rust/src/blake2b.rs` | this project's own bundled scalar implementations | ✓ portable, KAT-tested |
@@ -339,14 +467,14 @@ matching that crate's C exactly, not working around header rot).
 | Consumer | Today | Plan |
 |---|---|---|
 | `rk/original` (Khovratovich C++) | ✅ done — portable C++14 fork on vendor BLAKE2b, byte-identical vectors | none further |
-| `rk` (Rust port) | own scalar via `blake2b_simd` | none — already on the Rust canonical |
+| `rk` (Rust port) | hashes via `blake2b_simd` | none — appropriate for a port harness (not consensus code) |
 | `rz` | vendored-crate C + glue → vendor BLAKE2b (repo-relative) | keep glue (see §6); done |
 | `cs` | vendor BLAKE2b via CMake (repo-relative) | done |
-| **RT** (unstarted port) | reference binary now buildable **natively** (§0) | build the native reference at each `(WN,RESTBITS)`, generate vectors incl. multi-thread invariance, then Rust port with `blake2b_simd` (`many` for leaf gen); Rosetta only as an optional second oracle |
+| **RT** (unstarted port) | reference binary now buildable **natively** (§0) | build the native reference at each `(WN,RESTBITS)`, generate vectors incl. multi-thread invariance, then the Rust port (backend per §0's Rust tiers, batching per §5.3) |
 | `Req/cpp` | bundles its own scalar `blake2b.h` | migrate to vendor BLAKE2b (delete the bundled copy) next time that file is touched — low priority, it's correct and KAT-gated today |
-| `Req/rust` | bundled scalar + `blake2b_simd` feature + `blake3` feature | none — already the target shape (Seam A stays open per `ARCHITECTURE.md` §1a) |
+| `Req/rust` | bundled scalar + `blake2b_simd` feature + `blake3` feature | wire `blake2ref` (§0) in at Seam A as the reference hasher and retire the bundled scalar duplicate — **pending approval** (consensus-path change); `blake2b_simd`/`blake3` stay as measured candidates |
 | Zero400/ZeroPerf | libsodium 1.0.21 (`crypto_generichash` + Ed25519 + AEAD + scalarmult, §4.2) | **no change** — sodium is load-bearing across four primitives there; replacing it is out of scope and unjustified |
-| Zebro | zebra → `equihash` crate → `blake2b_simd` | **no change needed** — already on the Rust canonical; a future Requihash solver in Zebro uses `blake2b_simd::Params::personal(...)` + `many`, i.e. the same stack, new personalization string |
+| Zebro | zebra → `equihash` crate → `blake2b_simd` | **no change now** — but the inheritance is not treated as endorsement; a future Requihash solver in Zebro picks its backend on Req's measurements (Seam A posture), with `Params::personal(...)` + `many` the likely shape |
 
 Net: after this session only two open items remain — RT's port (now on
 a clean native path) and an eventual `Req/cpp` unification onto the

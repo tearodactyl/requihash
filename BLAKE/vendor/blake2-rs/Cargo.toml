@@ -1,0 +1,17 @@
+[package]
+name = "blake2ref"
+version = "0.1.0"
+edition = "2021"
+description = "Thin Rust binding to the repository's single vendored BLAKE2b reference implementation (BLAKE/vendor/blake2) -- one implementation across every use case, C++ and Rust alike"
+publish = false
+
+[lib]
+name = "blake2ref"
+path = "src/lib.rs"
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+blake2b_simd = "1"
+blake3 = "1"

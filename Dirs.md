@@ -37,9 +37,15 @@ first, every time.
 ## 1. ZKs
 
 Docs:
-- `EquihashSurvey.md` — neutral algorithm/history/parameter survey. Distinct
-  file from this directory's own `Equihash.md` (deeper Equihash/Requihash findings,
-  F-A1–F-A11); cite `Equihash.md` for Requihash-specific claims.
+- `EquihashSurvey.md` — neutral algorithm/history/parameter survey.
+  **Segregation criteria, explicit**: the survey carries project-neutral,
+  source-cited facts about the field (algorithm structure, history,
+  parameter sets, implementations, contributors) and must remain
+  publishable standalone — no project findings, no evidence grades, no
+  recommendations. `Equihash.md` (this directory) carries this program's
+  own analysis: evidence-graded findings F-A1–F-A11, measured `Req/`
+  results, and recommendations. A fact both need lives in the survey and
+  is cited; the finding interpreting it lives in `Equihash.md`.
 - `Comparison.md` — cross-implementation comparison, stable numbered
   sections. §3 PoW (~line 109), §13 mining interfaces (~line 756), §12
   indexer/explorer services.
