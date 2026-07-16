@@ -7,7 +7,7 @@
 //! `~/.cargo/registry`, unmodified, not copied) together with
 //! `cross_check_c/harness_main.c` (harness code written for this port) and
 //! the reference BLAKE2b implementation at
-//! `~/Work/ZK/ZKs/blake2-reference/ref/blake2b-ref.c` (Samuel Neves, CC0 --
+//! `~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/blake2b-ref.c` (Samuel Neves, CC0 --
 //! a separate, unmodified reference crypto implementation, not the pinned
 //! equihash-0.3.0 source).
 //!
@@ -94,12 +94,18 @@ fn main() {
     let harness_dir = manifest_dir.join("cross_check_c");
     let harness_main = harness_dir.join("harness_main.c");
 
-    let blake2_ref_dir = PathBuf::from(env::var("HOME").unwrap())
-        .join("Work/ZK/ZKs/blake2-reference/ref");
+    // Vendored portable BLAKE2b (repo-relative, no machine-specific path);
+    // RZ_BLAKE2_REF_DIR overrides for building against a different copy.
+    // Provenance: ../../../BLAKE/vendor/blake2/PROVENANCE.md.
+    let blake2_ref_dir = match env::var("RZ_BLAKE2_REF_DIR") {
+        Ok(dir) => PathBuf::from(dir),
+        Err(_) => manifest_dir.join("../../../BLAKE/vendor/blake2"),
+    };
     let blake2b_ref_c = blake2_ref_dir.join("blake2b-ref.c");
     assert!(
         blake2b_ref_c.exists(),
-        "reference blake2b-ref.c not found at {} (expected local clone of the BLAKE2 reference repo)",
+        "vendored blake2b-ref.c not found at {} (see BLAKE/vendor/blake2/PROVENANCE.md, \
+         or set RZ_BLAKE2_REF_DIR)",
         blake2b_ref_c.display()
     );
 

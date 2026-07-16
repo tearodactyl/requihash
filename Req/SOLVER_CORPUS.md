@@ -412,6 +412,98 @@ same as RK — the `-t`/`-h`/`-n`/`-r`/`-s`/`-x`/`-c` argument parsing in
 `equi_miner.cpp`'s `main` is harness code, not algorithm, and stays out of
 the ported library.
 
+#### Build environment — the AVX2 blocker is resolved (2026-07-15)
+
+RT was previously recorded as genuinely blocked: `equi_miner.h` includes
+`blake2-avx2/blake2bip.h`, which the original repo only compiles with
+real x86 AVX2 intrinsics (`-mavx2 -DNBLAKES=4` or `8`), with no ARM
+equivalent, and a Linux/x86_64 VM was proposed once and explicitly not
+approved. **Re-investigated and resolved without a VM**: this machine
+has Rosetta 2 (`arch -x86_64 <binary>` runs x86_64 Mach-O binaries
+transparently), and Apple's clang is a cross-compiler — `clang++ -target
+x86_64-apple-macos -march=haswell -mavx2 ...` produces a real x86_64
+binary directly on this arm64 host, no VM, no separate toolchain
+install. Confirmed working end to end at `(WN=48, WK=5, RESTBITS=4)`:
+
+- The plain scalar build (no `NBLAKES`, `-DATOMIC`, `equi_miner.cpp` +
+  `blake/blake2b.cpp`, cross-compiled for x86_64 with `-march=haswell`)
+  compiles and, run via `arch -x86_64 ./eq485_x86`, finds the same
+  solution count at `-t 1`, `-t 2`, and `-t 4` — genuine thread-count
+  invariance through the real `pthread_barrier_t` path, not merely a
+  `-t` flag that's silently ignored.
+- The AVX2-interleaved build (`-mavx2 -DNBLAKES=4`, adding
+  `blake2-avx2/blake2bip.c` to the link) — the specific configuration
+  that was blocked — also compiles and runs correctly under Rosetta,
+  reporting "4-way blake2b" and finding the same solution.
+
+One additional, separate fix was needed beyond the target/arch flags:
+`blake/blake2.h` (and its identical duplicate,
+`blake2-avx2/blake2.h`) fail to compile under current clang's stricter
+struct-alignment ABI checking — `blake2sp_state`/`blake2bp_state`
+combine `#pragma pack(push,1)` with a 64-byte `ALIGN()` on an array
+whose element size isn't a multiple of 64, which clang now rejects as an
+error regardless of target architecture. This is the *same* bug RK hit
+(`../rk/README.md` "Build environment") and the same fix applies:
+`blake2sp_state`/`blake2bp_state` and their now-dangling
+`blake2sp_*`/`blake2bp_*` function declarations are unused by
+`equi.h`/`equi_miner.h`/`equi_miner.cpp`/`blake2bip.c` (confirmed by
+grep) and can be dropped from a copy of the header without changing any
+behavior. Separately, `blake2b.cpp`'s own local `blake2b_state S[1];`
+(inside the simple one-shot `blake2b()` wrapper) hits the same rule even
+after that fix — an *array* of `blake2b_state` (196 bytes, not a
+multiple of 64) is still rejected — changed to a bare `blake2b_state S;`
+with `&S` passed where the array previously decayed to a pointer; this
+function is not on any hot path `equi_miner.h`'s own per-hash calls use
+(`equi.h`'s `genhash`/`setheader` call `blake2b_init_param`/
+`blake2b_update`/`blake2b_final` directly on a caller-owned state, never
+through the one-shot `blake2b()` wrapper), so this change is inert for
+the algorithm's actual behavior.
+
+A **separate, abandoned attempt** during this same investigation is
+worth recording so it isn't retried: reimplementing `blake2b.cpp`'s
+compression function in portable scalar C++ (no SSE intrinsics, same
+`blake2b_state` layout) to get a native arm64 build, rather than
+cross-compiling for x86_64. This produced a *working but incorrect*
+implementation — it compiled and ran, but its digest did not match the
+standard BLAKE2b-512("abc") test vector, while the real x86_64 SSE
+original (once cross-compiled and run via Rosetta) does match. The
+scalar reimplementation's row4-counter/finalization-flag injection or
+G-function/diagonalize mapping had a bug not yet isolated; rather than
+keep debugging a reimplementation, cross-compilation + Rosetta was
+adopted instead, since it uses the actual, unmodified (modulo the header
+fix) SSE algorithm rather than a second, independently-fallible
+translation of it. **Do not resume the portable-scalar-reimplementation
+approach without a specific reason to avoid Rosetta** — the
+cross-compile path is simpler, verified correct against a known-good
+vector, and needs no algorithm re-derivation.
+
+**Superseded strategy note (2026-07-16)**: the cross-compile+Rosetta
+route below remains valid but is now the *fallback oracle*, not the
+primary path. `equi_miner` builds **natively on arm64 as straight
+portable C++**: point the include path at the modern vendored reference
+header (an include-dir shim mapping `blake/blake2.h` →
+`BLAKE/vendor/blake2/blake2.h`) and link `blake2b-ref.c` — no source
+edits, no header patch, no emulation. Verified: the native arm64 binary
+reproduces the Rosetta-run x86 SSE original's `(48,5)` solve trace
+exactly, thread-count-invariant at `-t 1/2/4`. This works because
+tromp's compacted `blake2b_state` is an internal micro-optimization,
+not a wire format — his variant produces standard BLAKE2b digests, so
+the standard state layout drops in via the header alone. The modern
+header also has none of the 2016 packed-struct bugs, so the
+`tromp-header-fix` patch is unnecessary on this path. RT's reference
+binaries should be built this way; use Rosetta only as an optional
+second oracle. Decision record and recipe: `BLAKE/BLAKE.md` §0.
+
+**What this means for the port**: RT can now generate real KAT vectors
+and validate a Rust port against genuine tromp-original output (both
+scalar and AVX2-interleaved-4-way), including real thread-count
+invariance, using cross-compilation + Rosetta as the reference-binary
+strategy — no VM needed, no ARM BLAKE2b port needed for the *reference*
+side (the Rust port itself still needs its own portable BLAKE2b, same as
+RK/RZ used). No Rust code has been written yet; the cross-check harness,
+full vector generation across every supported `(WN,RESTBITS)`, and the
+actual port are unstarted follow-on work.
+
 #### Parameters
 
 Tromp's C solver is **not parametrically general** — it is specialized

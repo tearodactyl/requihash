@@ -149,11 +149,12 @@ before use here — every prediction matched the published value to within
 
 **Note on `scripts/equihash_formulas.py`**: this table's underlying
 formulas are also implemented there as a reusable script (`--csv`/
-`--validate` modes), but its `SWEEP_POINTS` currently reproduce an older,
-smaller version of the sweep below, not this table as it stands —
-flagged as out of sync in `Req/PLAN.md` A20, not yet fixed. Do not treat
-the script's own default output as authoritative until that's resolved;
-this table (below) is the current source of truth.
+`--validate` modes). `SWEEP_POINTS` was synced to this table's exact
+points (2026-07-15, `Req/PLAN.md` A20) and its default output now
+reproduces every row below exactly (values agree to the rounding
+precision each format uses). Keep the two in sync going forward — if
+this table's sweep changes, update `SWEEP_POINTS` in the same pass
+rather than letting them drift again.
 
 | k | n | ell | init list N | sol size (min/compact) | verify hashes (m=1) | naive peak mem (this repo's formula) | Equihash memory (extrapolated) | Requihash memory (extrapolated) |
 |---|---|---|---|---|---|---|---|---|

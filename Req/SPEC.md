@@ -114,11 +114,19 @@ One hash call per leaf; `2^(ℓ+1)` calls per attempt.
 The **leaf string** is the first `n` bits of `D(i)` (bytes `D[0 .. n/8]`).
 For collision processing it is expanded to the padded row representation:
 each ℓ-bit segment is placed big-endian into `cbyte` bytes with leading zero
-padding (`expand_array` with `bit_len = ℓ`, `byte_pad = 0`; written to be
-interoperable, byte-accurate with zcashd's `ExpandArray` — not yet checked
-against real zcashd output byte-for-byte, since the available KAT vectors
-(`Req/PLAN.md` A14) are `keying=single` and this engine only implements
-`keying=regular`; closing this gap is tracked as `Req/PLAN.md` A19). Byte comparison of a `cbyte`
+padding (`expand_array` with `bit_len = ℓ`, `byte_pad = 0`; **verified**
+byte-accurate against the pinned `equihash` crate's own zcashd-derived
+`expand_array`/`compress_array`, called directly via a visibility-widened
+vendored copy (`Req/third_party/equihash-0.3.0-vendored/`, since those
+functions are `pub(crate)` upstream — `PATCH.md` there documents the
+exact diff) — `Req/rust/src/lib.rs`'s
+`expand_compress_array_round_trips_against_pinned_equihash_crate` and
+`get_minimal_from_indices_matches_pinned_equihash_crate` tests run both
+implementations side-by-side on the same inputs and assert byte-exact
+agreement, isolating the bit-packing layer only (the crate's public
+`is_valid_solution` additionally exercises `keying=single` hashing this
+engine doesn't implement, so that entry point alone couldn't be used;
+`Req/PLAN.md` A19). Byte comparison of a `cbyte`
 segment is then exactly ℓ-bit comparison. The expanded row is representation, not consensus; the
 consensus object is the n-bit leaf string.
 
@@ -194,13 +202,12 @@ the wrong class simply hashes differently), not by an extra check.
 
 ### 8.1 Minimal (implemented; Equihash-compatible shape)
 
-`(ℓ+1)` bits per index, big-endian bit-packed (`compress_array`, written to
-be interoperable, byte-accurate with zcashd — the wire-size count matches
-the paper's published Table 3 exactly, `1344 at (200,9)` per
-`table3_wire_sizes`, but byte-for-byte content has not been checked against
-real zcashd output; same verification gap as §4.2's `expand_array`,
-tracked as `Req/PLAN.md` A19): wire size `2^k · (ℓ+1) / 8` bytes — 1344
-at (200,9). Round-trips via `get_minimal_from_indices` /
+`(ℓ+1)` bits per index, big-endian bit-packed (`compress_array`, **verified**
+byte-accurate with zcashd's own `CompressArray`/`GetMinimalFromIndices`
+via the pinned `equihash` crate's fixed vectors — see §4.2; the wire-size
+count also matches the paper's published Table 3 exactly, `1344 at
+(200,9)` per `table3_wire_sizes`): wire size `2^k · (ℓ+1) / 8` bytes —
+1344 at (200,9). Round-trips via `get_minimal_from_indices` /
 `get_indices_from_minimal`.
 
 ### 8.2 Compact (sized; codec not implemented)

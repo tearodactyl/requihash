@@ -1,0 +1,4 @@
+{"key":"find_proof/n60_k4","units":1,"reps":7,"min_ns":3037041,"median_ns":3181042,"mad_ns":83208,"tag":"apple-silicon-m-series","arch":"aarch64","git_rev":"e1c14e3","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n90_k5","units":1,"reps":7,"min_ns":32409500,"median_ns":33134458,"mad_ns":66625,"tag":"apple-silicon-m-series","arch":"aarch64","git_rev":"e1c14e3","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n100_k4","units":1,"reps":7,"min_ns":1792233708,"median_ns":1798280958,"mad_ns":2795833,"tag":"apple-silicon-m-series","arch":"aarch64","git_rev":"e1c14e3","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n108_k5","units":1,"reps":7,"min_ns":904510209,"median_ns":910718000,"mad_ns":3099542,"tag":"apple-silicon-m-series","arch":"aarch64","git_rev":"e1c14e3","git_dirty":true,"profile":"release"}

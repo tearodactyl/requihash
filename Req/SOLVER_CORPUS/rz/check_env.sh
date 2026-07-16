@@ -31,12 +31,12 @@ else
 fi
 
 echo "== Reference BLAKE2b (hardcoded path, see ENVIRONMENT.md) =="
-blake2_ref="$HOME/Work/ZK/ZKs/blake2-reference/ref/blake2b-ref.c"
+blake2_ref="${RZ_BLAKE2_REF_DIR:-$(dirname "$0")/../../../BLAKE/vendor/blake2}/blake2b-ref.c"
 if [ -f "$blake2_ref" ]; then
     echo "  OK: $blake2_ref"
 else
     echo "  MISSING: $blake2_ref"
-    echo "    Fix: git clone https://github.com/BLAKE2/BLAKE2 ~/Work/ZK/ZKs/blake2-reference"
+    echo "    Fix: restore BLAKE/vendor/blake2 (see its PROVENANCE.md) or set RZ_BLAKE2_REF_DIR"
     ok=0
 fi
 

@@ -21,7 +21,10 @@ cross-implementation measurement, separate from the pending Group A-C work;
 Equihash/Requihash/Sequihash (research, not adopted, kept separate from this
 spec so it doesn't pollute pending-implementation context);
 [../Dirs.md](../Dirs.md) — how the surrounding directories (ZKs reference
-clones, Zebro, Zero400/ZeroPerf) relate to this work.
+clones, Zebro, Zero400/ZeroPerf) relate to this work;
+[../BLAKE/BLAKE.md](../BLAKE/BLAKE.md) — BLAKE-family theory, provenance,
+API flavors, and this project's portability patches to third-party BLAKE2
+code (the hash-primitive companion to this spec's Seam A).
 
 ## Origin and scope
 
@@ -145,15 +148,17 @@ sweeps everything. This is deliberate, not an oversight: `SOLVER_CORPUS.md`'s
 own cross-cutting requirement is that each port needs "no other context
 needed from this repository's other documents," and a shared workspace
 would quietly couple every port's dependency resolution and lockfile to
-every other's. Concretely, four independent Rust packages exist today,
-each with its own `Cargo.toml`/`Cargo.lock`/`target/`:
+every other's. Concretely, five independent Rust packages exist today,
+each with its own `Cargo.toml`/`Cargo.lock`/`target/` (CS is a separate,
+CMake-built C++ crate, not Cargo — see `SOLVER_CORPUS/cs/README.md`):
 
 | Crate | Path | Depends on (path deps) |
 |---|---|---|
 | `requihash` | `rust/` | none — only crates.io deps |
 | `reqbench` | `SOLVER_CORPUS/reqbench/` | none — dependency-free by design (`BENCH.md`) |
 | `rz` | `SOLVER_CORPUS/rz/` | `reqbench` (relative path `../reqbench`) |
-| *(future)* `rk`/`rt`/`cs` | `SOLVER_CORPUS/{rk,rt,cs}/` | will depend on `reqbench` the same way `rz` does, per `SOLVER_CORPUS/_template/` |
+| `rk` | `SOLVER_CORPUS/rk/` | `reqbench` (relative path `../reqbench`) |
+| *(future)* `rt` | `SOLVER_CORPUS/rt/` | will depend on `reqbench` the same way `rz`/`rk` do, per `SOLVER_CORPUS/_template/` |
 
 **Expected usage: `cd` into the crate you want, then plain `cargo`
 commands** — never `--manifest-path` from `Req/`'s own root for anything

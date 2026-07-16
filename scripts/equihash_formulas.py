@@ -142,9 +142,9 @@ def validate_against_paper_table3(verbose: bool = True) -> bool:
 # The extrapolated sweep used in SIZING.md section 2 -- kept here so it can
 # be regenerated identically rather than hand-copied into a table again.
 SWEEP_POINTS = {
-    5: [24, 48, 72, 168, 192, 216],
-    7: [32, 96, 168, 232, 264, 296],
-    9: [40, 120, 240, 280, 320, 360],
+    5: [24, 48, 72, 96, 120, 144, 168, 192, 216],
+    7: [32, 96, 128, 168, 192, 232, 264, 296],
+    9: [40, 120, 160, 200, 240, 280, 320],
 }
 
 

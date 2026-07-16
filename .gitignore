@@ -1,3 +1,4 @@
+Cargo.lock
 Req/rust/target/
 Req/cpp/build/
 Req/SOLVER_CORPUS/*/target/

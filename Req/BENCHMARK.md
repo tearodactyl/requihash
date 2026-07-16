@@ -114,7 +114,7 @@ Verify is ~7 us regardless of n, because it always processes just `2^k = 32`
 leaves through k fixed rounds. At ~140k verifies/second single-threaded, the
 consensus-critical path is not a bottleneck and needs no acceleration — which
 vindicates keeping it as the scalar, portable, non-seam reference
-(HardwareBridge.md "verification must stay boring"). A full node validating
+(the "verification must stay boring" consensus-path principle). A full node validating
 blocks spends negligible time here.
 
 ## 5. C++ vs Rust, and the optimization it drove
@@ -351,9 +351,9 @@ at R = 0.83, marginal).
 the `blake3` crate's build script enables its NEON C intrinsics
 automatically on any aarch64 target (`is_aarch64() && is_little_endian()`,
 no feature flag). BLAKE2b has a comparable NEON implementation too — the
-official `BLAKE2/BLAKE2` repo ships a maintained `neon/blake2b-neon.c` with
+official `BLAKE2/BLAKE2` repo ships a maintained `neon/blake2b-neon.c` (judged **premature to pursue** — A13 demoted to icebox, full analysis `BLAKE/BLAKE.md` §5.2: BLAKE2b's 64-bit words are NEON-hostile and hashing is a minor cost share) with
 a dedicated aarch64 makefile (local clone:
-`~/Work/ZK/ZKs/blake2-reference`) — but no published Rust crate wraps it
+`~/Work/ZK/ZKs/BLAKE/blake2-reference`) — but no published Rust crate wraps it
 the way `blake3` wraps its own; the gap is packaging, not the existence of
 BLAKE2b NEON code. `blake3`'s automaticity comes specifically from its
 `build.rs` shelling out to a C compiler at build time and setting

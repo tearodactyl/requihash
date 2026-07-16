@@ -47,8 +47,8 @@ not the first. The seam structure is unchanged; the priority ordering is the
 correction the data forced.
 
 The verifier is deliberately *not* a seam. It stays single, scalar, portable, and
-auditable, because it is the consensus-critical path (HardwareBridge.md: "verification
-must stay boring"). A miner may be exotic; a verifier may not.
+auditable, because it is the consensus-critical path ("verification
+must stay boring" — the consensus-path design principle). A miner may be exotic; a verifier may not.
 
 ## 1a. Not married to any specific backend, binding, or GBP parametrization
 
@@ -281,13 +281,13 @@ Three alternatives were considered and rejected:
   startup), so a trait object at Seam A is the honest type. The per-leaf virtual
   call is amortized by `hash_many` operating on whole batches, not one leaf.
 - **Depend on one SIMD crate and stop** — good for Rust today, but forecloses the
-  hardware tier (F-X1's convergent MAC substrate, GPU/FPGA offload) and the C++
+  hardware tier (a convergent inference-hardware MAC substrate, GPU/FPGA offload) and the C++
   side. The trait keeps that door open at the cost of one indirection.
 
 The structure costs one function-pointer indirection per *batch* (not per leaf)
 and one startup detection. In exchange, the same core encoding + verifier +
 difficulty logic is written once and every acceleration tier — present and future,
-CPU SIMD through the inference-hardware MAC arrays of HardwareBridge.md F-X1 —
+CPU SIMD through inference-hardware MAC arrays —
 plugs into the two named seams behind a self-test gate.
 ```
 

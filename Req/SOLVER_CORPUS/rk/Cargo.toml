@@ -1,0 +1,26 @@
+[package]
+name = "rk"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of Khovratovich's original CC0 C++11 Equihash reference solver (equihash-khovratovich/Source/C++11/pow.{h,cc})"
+publish = false
+
+[lib]
+name = "rk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rk_gen"
+path = "src/bin/rk_gen.rs"
+
+[[bin]]
+name = "rk_bench"
+path = "src/bin/rk_bench.rs"
+
+[dependencies]
+blake2b_simd = { version = "1", default-features = false }
+reqbench = { path = "../reqbench" }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

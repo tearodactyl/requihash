@@ -51,27 +51,20 @@ that is **not** fetched automatically and must exist locally before
    `tromp/` directory (e.g. a `cargo vendor` output, or the crate source
    extracted from its `.crate` tarball) to bypass the registry-cache glob
    entirely.
-3. **The reference BLAKE2b implementation, hardcoded to a specific local
-   path** — `~/Work/ZK/ZKs/blake2-reference/ref/blake2b-ref.c`, a local
-   clone of `github.com/BLAKE2/BLAKE2` (pinned at commit `ed1974ea8`,
-   2023-02-12, per that clone's own `git log`). This is the one genuinely
-   fragile dependency: `build.rs` hardcodes this exact path
-   (`$HOME/Work/ZK/ZKs/blake2-reference/ref`) with no environment-variable
-   override and no vendoring into this crate — if that clone moves, gets
-   deleted, or this crate is ever checked out on a different machine, the
-   build fails with an assertion naming the missing path, not a silent
-   fallback. **Flagged here as the one environment dependency worth fixing
-   before this crate leaves this machine** — either vendor a copy of
-   `blake2b-ref.c`/`.h` into `cross_check_c/` directly (CC0/public-domain,
-   no licensing obstacle) or add an `RZ_BLAKE2_REF_DIR` override matching
-   the pattern already used for `RZ_EQUIHASH_TROMP_DIR`.
+3. **The reference BLAKE2b implementation — the repository's vendored
+   copy** (`../../../BLAKE/vendor/blake2`, repo-relative; provenance and
+   update procedure in its `PROVENANCE.md`). `RZ_BLAKE2_REF_DIR`
+   overrides it. The previous hardcoded `$HOME` path to a ZKs clone —
+   flagged here as the one environment dependency worth fixing — was
+   resolved 2026-07-16 by exactly the vendoring option this note
+   proposed.
 
 ## What `build.rs` actually does, in build order
 
 1. Resolve the vendored `equihash-0.3.0/tromp/` directory (registry glob,
    or `RZ_EQUIHASH_TROMP_DIR` override).
 2. Assert `equi_miner.c` exists there.
-3. Assert `~/Work/ZK/ZKs/blake2-reference/ref/blake2b-ref.c` exists.
+3. Assert `~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/blake2b-ref.c` exists.
 4. For each of three `(WN, WK, RESTBITS)` triples — `(200,9,9)`,
    `(200,9,8)`, `(144,5,4)` — invoke the discovered C compiler directly
    (not via `cc::Build`'s own archive-producing `compile()`/`try_compile()`,

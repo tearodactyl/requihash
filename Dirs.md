@@ -16,7 +16,15 @@ first, every time.
   incremental C++, stock Equihash as deployed, **not** Rust/Zebra-code-compatible.
   Not derived from this work; tracked separately.
 - ZKs is a neutral reference shelf: cloned upstream repos + project-agnostic
-  survey docs, used by all of the above.
+  survey docs, used by all of the above. BLAKE-family clones are grouped
+  under `ZKs/BLAKE/` (`blake2-reference`, `libb2`, `blake2_simd`, `BLAKE3`,
+  `BLAKE3-specs`).
+- `BLAKE/` under this directory is the single home for BLAKE-family
+  theory, provenance, API guidance, and this project's own portability
+  patches to third-party BLAKE2 code — `BLAKE/BLAKE.md` is the document,
+  `BLAKE/vendor/blake2/` the canonical vendored implementation every
+  C/C++ consumer builds against (repo-relative, no absolute paths),
+  `BLAKE/RFC/` the RFC 7693 copy with extracted, validated sample code.
 
 | Directory | Role | Contains |
 |---|---|---|
@@ -30,7 +38,7 @@ first, every time.
 
 Docs:
 - `EquihashSurvey.md` — neutral algorithm/history/parameter survey. Distinct
-  file from this directory's own `Equihash.md` (deeper Topic-A findings,
+  file from this directory's own `Equihash.md` (deeper Equihash/Requihash findings,
   F-A1–F-A11); cite `Equihash.md` for Requihash-specific claims.
 - `Comparison.md` — cross-implementation comparison, stable numbered
   sections. §3 PoW (~line 109), §13 mining interfaces (~line 756), §12
@@ -91,8 +99,8 @@ Hash-primitive clones (blake2b/blake3, behind `Req/`'s Seam A — see
 official C reference, `neon/` NEON backend analyzed in `BENCHMARK.md` §7a/
 PLAN.md A13), `blake2_simd` (`oconnor663/blake2_simd`, the Rust crate this
 project and Zebra both depend on), `BLAKE3` and `BLAKE3-specs`
-(`BLAKE3-team/BLAKE3` and its spec repo). Full citations for all of
-these: `PAPERS.md` §10 / `Equihash.md` §9.
+(`BLAKE3-team/BLAKE3` and its spec repo). Full citations, provenance, and the
+vendored canonical copy: `BLAKE/BLAKE.md` (this directory).
 
 Reach into these clones for: real `(n,k)`/personalization cross-checks
 (grep `chainparams.cpp` directly, don't trust memory); a second independent

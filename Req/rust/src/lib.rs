@@ -752,4 +752,123 @@ mod tests {
         t.swap(0, 1);
         assert!(eng.is_valid_solution(&t).is_err());
     }
+
+    // ---- A19: expand_array/compress_array vs. the pinned equihash crate ----
+    //
+    // Closes the gap PLAN.md A19 tracked: SPEC.md previously said this repo's
+    // ExpandArray/CompressArray reimplementation was "written to be
+    // interoperable, byte-accurate" without independent verification.
+    //
+    // The pinned crate's compress_array/expand_array/minimal_from_indices
+    // ("rough translation of CompressArray()/ExpandArray()/
+    // GetMinimalFromIndices() from zcash/zcash@6fdd9f1/src/crypto/equihash.cpp")
+    // are `pub(crate)` upstream, so calling them directly required a local,
+    // visibility-widened vendored copy rather than the plain crates.io
+    // dependency (editing cargo's own content-hash-verified registry cache
+    // in place isn't viable -- it's shared across every project on this
+    // machine and cargo detects/reverts local edits) --
+    // `../third_party/equihash-0.3.0-vendored/`, see its `PATCH.md` for the
+    // exact `pub(crate)` -> `pub` diff, nothing else changed. This calls that
+    // crate's real, unmodified logic directly, not a reproduction of its
+    // test fixtures.
+    #[test]
+    fn expand_compress_array_round_trips_against_pinned_equihash_crate() {
+        use equihash::minimal::{compress_array as eq_compress, expand_array as eq_expand};
+
+        // A pseudo-random byte stream (xorshift, no external RNG dependency)
+        // exercised at every bit_len/byte_pad combination this repo's own
+        // expand_array/compress_array actually uses (SPEC.md ss4.2/ss8.1: ell
+        // and ell+1 bit_len, byte_pad 0 and the 4-byte-index padding
+        // get_minimal_from_indices computes) -- broader coverage than a
+        // handful of fixed vectors, and every case is checked against the
+        // real crate function, not a copy of its expected output.
+        fn xorshift(state: &mut u64) -> u64 {
+            *state ^= *state << 13;
+            *state ^= *state >> 7;
+            *state ^= *state << 17;
+            *state
+        }
+
+        for &(bit_len, byte_pad, n_bits_total) in &[
+            (11usize, 0usize, 176usize), // matches the crate's own fixture shape
+            (21, 0, 168),
+            (14, 0, 224),
+            (11, 2, 176),
+            (20, 0, 320),  // ell=20 (e.g. (100,4)/(120,5))
+            (21, 0, 336),  // ell+1=21 (e.g. (200,9) neighbourhood: n/(k+1)=20)
+            (24, 0, 384),  // ell=24 (e.g. (144,5))
+            (24, 3, 384),  // byte_pad=3, the get_minimal_from_indices index-array shape
+        ] {
+            let mut state = 0x2545F4914F6CDD1Du64 ^ ((bit_len as u64) << 32) ^ (byte_pad as u64);
+            let in_width = bit_len.div_ceil(8) + byte_pad;
+            let n_words = n_bits_total / bit_len;
+            let expanded_len = n_words * in_width;
+            let mut expanded = vec![0u8; expanded_len];
+            for chunk in expanded.chunks_mut(in_width) {
+                for x in byte_pad..in_width {
+                    chunk[x] = xorshift(&mut state) as u8;
+                }
+                // Mask each element's top bits to fit bit_len, matching how
+                // real leaf/index data is always sub-byte-boundary-masked
+                // before packing -- otherwise compress_array/expand_array's
+                // round trip is only exact modulo the mask, which would
+                // make this test assert something neither implementation
+                // actually promises.
+                let extra_bits = 8 * (in_width - byte_pad) - bit_len;
+                if extra_bits > 0 && in_width > byte_pad {
+                    chunk[byte_pad] &= 0xFFu8 >> extra_bits;
+                }
+            }
+            let compact_len = bit_len * n_words / 8;
+
+            let ours_compact = compress_array(&expanded, compact_len, bit_len, byte_pad);
+            let theirs_compact = eq_compress(&expanded, bit_len, byte_pad);
+            assert_eq!(
+                ours_compact, theirs_compact,
+                "compress_array diverges from equihash crate at bit_len={bit_len} byte_pad={byte_pad}"
+            );
+
+            let ours_expanded = expand_array(&ours_compact, expanded_len, bit_len, byte_pad);
+            let theirs_expanded = eq_expand(&theirs_compact, bit_len, byte_pad);
+            assert_eq!(
+                ours_expanded, theirs_expanded,
+                "expand_array diverges from equihash crate at bit_len={bit_len} byte_pad={byte_pad}"
+            );
+            assert_eq!(
+                ours_expanded, expanded,
+                "expand(compress(x)) != x for this repo's own pair at bit_len={bit_len} byte_pad={byte_pad}"
+            );
+        }
+    }
+
+    #[test]
+    fn get_minimal_from_indices_matches_pinned_equihash_crate() {
+        use equihash::minimal::minimal_from_indices;
+        use equihash::params::Params;
+
+        // Real solved Requihash index sets at every (n,k) this repo tests
+        // elsewhere, fed through both this repo's get_minimal_from_indices
+        // and the vendored crate's real minimal_from_indices, asserting
+        // byte-exact agreement -- not a comparison against copied fixture
+        // bytes.
+        for &(n, k) in &[(48u32, 5u32), (72, 5)] {
+            let p = Params::new(n, k).expect("valid (n,k) for the vendored crate too");
+            let cbitlen = (n / (k + 1)) as usize;
+            assert_eq!(cbitlen, p.collision_bit_length());
+
+            let req_p = crate::Params { n, k };
+            for nonce in 0u32..10 {
+                let eng = Requihash::new(req_p, b"a19-crosscheck", &nonce.to_le_bytes());
+                for sol in eng.solve() {
+                    let ours = get_minimal_from_indices(&sol, cbitlen);
+                    let theirs = minimal_from_indices(p, &sol);
+                    assert_eq!(
+                        ours, theirs,
+                        "minimal encoding diverges from equihash crate at (n={n},k={k}) nonce={nonce}"
+                    );
+                    assert_eq!(get_indices_from_minimal(&ours, cbitlen), sol);
+                }
+            }
+        }
+    }
 }
