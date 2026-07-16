@@ -81,7 +81,8 @@ to check all prerequisites in one step.
   (`rz_xcheck_144_4`, `rz_xcheck_200_8`, `rz_xcheck_200_9`) by compiling
   the vendored, unmodified `equi_miner.c` against a glue-code BLAKE2b
   wrapper (`cross_check_c/`) isolating it from the reference BLAKE2b
-  implementation at `~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/`. Only the
+  implementation vendored at `BLAKE/vendor/blake2/` (repo-relative;
+  `RZ_BLAKE2_REF_DIR` overrides). Only the
   `_144_4` binary is exercised by this pass's tests.
 - `cross_check_c/` — `harness_main.c`, `blake2b_glue.c/h`: harness code
   written for this port (not vendored/pinned source), reproducing

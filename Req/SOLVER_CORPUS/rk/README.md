@@ -77,7 +77,8 @@ timing stats the original prints, not the search itself); replace the
 *included* `blake/blake2.h` with a 20-line stub declaring only the one
 function `pow.cc` actually calls (`blake2b`, the simple one-shot API,
 avoiding the packed-struct declarations entirely); and link against
-`~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/blake2b-ref.c` (Samuel Neves, CC0,
+the repository's vendored copy `BLAKE/vendor/blake2/blake2b-ref.c`
+(Samuel Neves, CC0,
 portable C, no intrinsics) through a small glue translation unit that
 presents `pow.cc`'s exact expected signature
 (`blake2b(out,in,key,outlen,inlen,keylen)` — note the argument order

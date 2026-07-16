@@ -113,13 +113,12 @@ from the Python reference here (it defines none).
 
 ## Build environment
 
-Same portable-BLAKE2b dependency as `../rk/` and `../rz/`:
-`~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/blake2b-ref.c` (Samuel Neves, CC0, no
-x86-specific intrinsics — builds unmodified on this machine's arm64 and
-would on x86_64 too). `CMakeLists.txt` hardcodes this path (matching
-RZ's own `ENVIRONMENT.md`-flagged fragile-local-path situation, not yet
-fixed there either) — override with `cmake -DBLAKE2_REF_DIR=...` if that
-clone moves.
+Same portable-BLAKE2b dependency as `../rk/` and `../rz/`: the
+repository's vendored copy `BLAKE/vendor/blake2/blake2b-ref.c` (Samuel
+Neves, CC0, no x86-specific intrinsics — builds unmodified on arm64
+and x86_64 alike), referenced repo-relative by `CMakeLists.txt`;
+override with `cmake -DBLAKE2_REF_DIR=...`. Provenance:
+`BLAKE/vendor/blake2/PROVENANCE.md`.
 
 One CMake-specific pitfall hit and fixed during this port: `project(...)`
 must declare **both** `CXX` and `C` (`project(cs_klist CXX C)`) —

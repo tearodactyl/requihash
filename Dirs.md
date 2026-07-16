@@ -17,8 +17,9 @@ first, every time.
   Not derived from this work; tracked separately.
 - ZKs is a neutral reference shelf: cloned upstream repos + project-agnostic
   survey docs, used by all of the above. BLAKE-family clones are grouped
-  under `ZKs/BLAKE/` (`blake2-reference`, `libb2`, `blake2_simd`, `BLAKE3`,
-  `BLAKE3-specs`).
+  under `ZKs/BLAKE/` (`blake2-reference`, `libb2`, `blake2_simd`,
+  `RustCrypto-hashes` — the monorepo carrying RustCrypto's `blake2`
+  as a subdirectory — `BLAKE3`, `BLAKE3-specs`).
 - `BLAKE/` under this directory is the single home for BLAKE-family
   theory, provenance, API guidance, and this project's own portability
   patches to third-party BLAKE2 code — `BLAKE/BLAKE.md` is the document,

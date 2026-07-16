@@ -23,8 +23,11 @@ exists per consumer for exceptional cases: `RZ_BLAKE2_REF_DIR`,
 block (`personal`), streaming with a cheaply copyable state (the
 midstate pattern), portability across Linux/macOS/Windows on
 arm64/x86_64, single provenance and auditability, and acceleration
-added later *to the same implementation* via runtime dispatch (§5.4) —
-never by swapping libraries. One implementation satisfies all of it:
+added *within the implementation* as dispatch-selected kernel variants
+(§5.4) — a rule scoped to the primitive's internals, not to consumer
+seams, where independent implementations remain swappable measured
+candidates behind equivalence gates (origin, justification, and exact
+scope: `UniBlake.md` §1b). One implementation satisfies all of it:
 the vendored reference — for C/C++, which consume it directly. For
 Rust, applying the project's own change criterion (an incumbent stays
 unless a challenger is clearly superior in tight code, performance, or
@@ -45,15 +48,23 @@ file for Rust — with **[vendor/blake2-rs/](vendor/blake2-rs/)
 artifact (bound to the exact vendored object code; validated against
 the published "abc" vector, CPython `hashlib` personalization vectors,
 and `blake2b_simd`; available to any future consumer that genuinely
-needs C-object parity). `blake2b_simd` is a *measured x86-acceleration
+needs C-object parity — a production-validated construction: CKB ships
+consensus hashing through exactly this wrapper genre, see
+[vendor/blake2-rs/README.md](vendor/blake2-rs/README.md) "Comparable
+products"). `blake2b_simd` is a *measured x86-acceleration
 candidate at Seam A* — nothing more. No Seam A rewiring is planned.
+(Forward note: under the UniBlake proposal, vendoring-vs-revamp-vs-
+originate becomes a per-component decision governed by conformance
+gates and documented provenance, not doctrine — `UniBlake.md` §1a.
+The vendored-unmodified stance above describes today's consumers, not
+a permanent constraint.)
 
 Alternatives considered and rejected as the canonical C/C++ choice:
 
 | Alternative | Why not |
 |---|---|
 | RFC 7693 appendix code | no parameter block → no personalization → cannot express Equihash (§3.4) |
-| libb2 (system library) | autotools-only (poor Windows story), packaging overhead for what is one CC0 C file, dormant upstream |
+| libb2 (system library) | official and same-vintage as the reference (2023 sync, key-length fix present) — "dead" is not the issue; the issues are concrete: x86-only dispatch (no NEON; AVX2 commented out in `blake2-dispatch.c`), an open data race in its fat-mode function-pointer install (its #39, 2022), broken detection on arm64 macOS (its #36 — our machine class), aging autotools (its #40; no CMake/MSVC), no release since 0.98.1 so distros ship older code, and it retains the legacy 2016 argument order (`blake2b(out, in, key, …)` — its #47), i.e. §3.3's trap institutionalized |
 | libsodium | correct and maintained, but a large dependency for one primitive; right where it's already present (Zero400), wrong as a new dependency for standalone tools |
 | OpenSSL EVP | no personalization exposed (§3.4) — disqualifying |
 | 2016 vendored snapshots (Khovratovich/tromp bundles) | don't compile on current toolchains (§6); superseded by this decision |
@@ -127,7 +138,7 @@ expectations and CPU-dispatch behavior:
 | Channel | What it is | Toolchain / platform | SIMD selection |
 |---|---|---|---|
 | [BLAKE2/BLAKE2](https://github.com/BLAKE2/BLAKE2) package | authors' source drop, meant for vendoring: `ref/` (portable C99), `sse/` (SSE2→AVX `__m128i` C), `neon/` (ARM), `power8/` | any C compiler for `ref/`; x86 + `-msse2/-mssse3/-msse4.1/-mavx` for `sse/` (selected via `blake2-config.h` `HAVE_*` macros) | **compile-time only** — no runtime dispatch anywhere in the package |
-| [libb2](https://github.com/BLAKE2/libb2) | the team's installable library (`libb2.so`/`.pc`; Debian `libb2-dev`) | autotools (`autogen.sh && configure && make`): fine on Linux and macOS (arm64 builds the portable path); Windows only via MSYS2/MinGW or vcpkg's port — no native MSVC build | configure-time by default; `--enable-fat` builds multi-arch x86 objects with **runtime** selection; `--enable-native` pins to build-machine CPU |
+| [libb2](https://github.com/BLAKE2/libb2) | the team's installable library (`libb2.so`/`.pc`; Debian `libb2-dev`) | autotools (`autogen.sh && configure && make`): fine on Linux and macOS (arm64 builds the portable path); Windows only via MSYS2/MinGW or vcpkg's port — no native MSVC build | configure-time by default; `--enable-fat` = runtime **x86-only** selection via `blake2-dispatch.c` (SSE2→AVX; AVX2 commented out; no NEON; open data-race issue #39; arm64-macOS detection issue #36); `--enable-native` pins to build CPU. Simple API keeps the legacy 2016 argument order (#47) |
 | libsodium | bundles its own package-derived BLAKE2b as `crypto_generichash` | everywhere (its whole point); Zero400 pins 1.0.21 via `depends/` | **runtime** (its `cpu_features` picker: ref/SSSE3/SSE4.1/AVX2 on x86) |
 | OpenSSL | BLAKE2b-512/BLAKE2s-256 since 1.1.0, EVP interface | everywhere OpenSSL is | portable C implementation (BLAKE2 is not in OpenSSL's asm set) |
 | Python `hashlib` | CPython bundles its own copy | in every Python ≥3.6 | portable |
@@ -140,7 +151,9 @@ package variants wholesale — the origin of every §6 problem.
 
 **Local clones** (all under `~/Work/ZK/ZKs/BLAKE/`): `blake2-reference`
 (= BLAKE2/BLAKE2, shallow @ `ed1974e` 2023-02-12 = upstream tip),
-`libb2`, `blake2_simd`, `BLAKE3`, `BLAKE3-specs`. Build-time source of
+`libb2`, `blake2_simd`, `RustCrypto-hashes` (shallow @ `f6c786d`
+2026-07-16; RustCrypto's `blake2` is a subdirectory of that monorepo,
+0.11.0-rc.6 at this commit), `BLAKE3`, `BLAKE3-specs`. Build-time source of
 truth is **not** the clones but [vendor/blake2/](vendor/blake2/) (§0).
 
 ## 3. APIs
@@ -322,6 +335,12 @@ salt/personal — not Equihash-capable (§3.4).
   needed here.
 - **`blake2-rfc`**: the pre-2018 de-facto standard (13.7M downloads),
   unmaintained since 2017-11 — historical only, do not adopt.
+- **C-wrapper crates** (`blake2b-rs` by Nervos/CKB — 1.05M downloads,
+  consensus-proven, dormant since 2020, vendors its own unversioned
+  package copies behind bindgen struct mirrors; `libsodium-sys-stable`;
+  dead `libb2-sys`): the genre this repository's own `blake2ref`
+  belongs to — full comparison and the first-party justification in
+  [vendor/blake2-rs/README.md](vendor/blake2-rs/README.md).
 - **`blake3`** (official, BLAKE3 team): Rust + vendored C/asm kernels
   via `build.rs`, runtime dispatch; has a `neon` feature (plus
   `no_neon`/`no_avx2`/… opt-outs) — NEON is real and default-detected

@@ -64,7 +64,8 @@ that is **not** fetched automatically and must exist locally before
 1. Resolve the vendored `equihash-0.3.0/tromp/` directory (registry glob,
    or `RZ_EQUIHASH_TROMP_DIR` override).
 2. Assert `equi_miner.c` exists there.
-3. Assert `~/Work/ZK/ZKs/BLAKE/blake2-reference/ref/blake2b-ref.c` exists.
+3. Assert the vendored `BLAKE/vendor/blake2/blake2b-ref.c` exists
+   (repo-relative; `RZ_BLAKE2_REF_DIR` overrides).
 4. For each of three `(WN, WK, RESTBITS)` triples — `(200,9,9)`,
    `(200,9,8)`, `(144,5,4)` — invoke the discovered C compiler directly
    (not via `cc::Build`'s own archive-producing `compile()`/`try_compile()`,

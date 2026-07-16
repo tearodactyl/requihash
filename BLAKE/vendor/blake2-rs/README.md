@@ -68,6 +68,44 @@ batch-API overhead) — the batch API earns its keep only on AVX2
 hardware, unmeasured here. `blake2ref`'s claim is uniform provenance
 (same object code as every C/C++ consumer), not peak speed.
 
+## Comparable products, and why this one exists anyway
+
+"Rust wrapper over the C BLAKE2 reference" is an established product
+genre, not an oddity of this repository — surveyed 2026-07-16:
+
+| Product | What it wraps | Bindings style | Param block | State handling | Status |
+|---|---|---|---|---|---|
+| **`blake2b-rs`** (Nervos/CKB, 1.05M downloads) | its **own vendored copies** of the official package — both `ref/` and `sse/`, 2020-era, commit unrecorded; `build.rs` picks `sse` when the target has SSE2/SSE4.1, else `ref` (compile-time, no runtime dispatch) | bindgen-generated (274 lines incl. `max_align_t`/`__fsid_t` noise); **mirrors `blake2b_state`/`blake2b_param` layouts in `#[repr(C)]` Rust structs** | full (key/salt/personal builder) | Rust-side struct mirror | dormant since 2020-07; used in CKB **consensus** hashing with personalization |
+| `libsodium-sys-stable` (1.38M, active) | all of libsodium; BLAKE2b via `crypto_generichash` | sys-crate | via `_salt_personal` variant | opaque, heap | maintained — but links an entire crypto library for one primitive |
+| `libb2-sys` (3.2k) | system libb2 | raw sys | — | — | dead (2015) |
+| **`blake2ref` (this crate)** | **the repository's single pinned vendored copy** (`../blake2` @ BLAKE2/BLAKE2 `ed1974e`) — the same bytes every C/C++ consumer compiles | ~100 handwritten lines + 30-line C accessor; no bindgen | `outlen` + `personal` (the Equihash subset; no key/salt by scope) | **opaque buffer, size reported by C at runtime** — no mirrored layout to desynchronize | this project, 2026-07-16 |
+
+What the survey establishes:
+
+1. **The genre is production-validated** — CKB ships consensus hashing
+   through exactly this construction (C reference behind a thin Rust
+   wrapper, personalization included). A wrapper over the reference is
+   a normal engineering product, not a workaround.
+2. **No external wrapper can serve this repository's requirement.** The
+   requirement is binding *the repository's own pinned bytes* — single
+   provenance shared with `rk/original`, `cs`, and `rz`. `blake2b-rs`
+   vendors its *own* unversioned 2020 copies; adopting it would add a
+   third BLAKE2b C provenance to the tree, the exact thing the vendor
+   decision eliminated. This is definitional: a provenance-binding
+   wrapper can only be first-party.
+3. **The layout-mirroring contrast is the design lesson.** `blake2b-rs`
+   freezes bindgen-generated `#[repr(C)]` struct layouts from 2020; if
+   its C were ever updated without regenerating, corruption would be
+   silent. This crate's opaque runtime-sized state makes that failure
+   mode structurally impossible — a vendor update either fits the
+   capacity or fails an assert loudly.
+4. **Honest deltas the other direction**: `blake2b-rs` exposes the full
+   parameter block (key/salt) and has an SSE fast path on x86;
+   this crate is `ref`-only and Equihash-scoped by design (key/salt add
+   when a consumer needs them; SIMD arrives via the §5.4 dispatch plan
+   in `../../BLAKE.md`, added to the same implementation rather than by
+   swapping).
+
 ## Status
 
 Built and validated; **not wired into `Req/rust`** — Seam A remains as
