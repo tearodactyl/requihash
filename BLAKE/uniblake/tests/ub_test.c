@@ -65,6 +65,39 @@ static void test_reference_agreement(void) {
   CHECK(all, "active kernel agrees with oracle across len/outlen/persona battery");
 }
 
+/* --- output-bounds: the digest must touch ONLY outlen bytes ---
+ * Pad a generous buffer with a sentinel (0xAA), hash into `outlen`
+ * bytes, and require that every byte AT or BEYOND outlen is still the
+ * sentinel — i.e. finalize never writes past the caller's requested
+ * length. This catches an over-write (writing 64 when 50 was asked)
+ * that a plain oracle-agreement check on the first outlen bytes would
+ * miss. Exercised across the Requihash digest neighborhood and the
+ * extremes. 0xAA (0b10101010) is chosen because it is not 0x00, not
+ * 0xFF, and not a plausible digest byte pattern, so any stray write
+ * shows up unambiguously. */
+static void test_output_bounds(void) {
+  printf("[bounds] finalize writes exactly outlen bytes, no more\n");
+  uint8_t in[200];
+  for (size_t i = 0; i < sizeof in; ++i) in[i] = (uint8_t)(i + 5);
+  const uint8_t persona[16] = "ZcashPoW\0\0\0\0\0\0\0";
+
+  static const size_t olens[] = { 1, 25, 48, 50, 54, 60, 63, 64 };
+  int all = 1;
+  for (int p = 0; p < 2; ++p) {
+    const uint8_t *pers = p ? persona : NULL;
+    for (size_t oi = 0; oi < sizeof(olens)/sizeof(olens[0]); ++oi) {
+      size_t olen = olens[oi];
+      uint8_t buf[128];
+      memset(buf, 0xAA, sizeof buf);            /* sentinel-fill the whole buffer */
+      ub_blake2b(buf, olen, in, sizeof in, pers);
+      for (size_t j = olen; j < sizeof buf; ++j) /* everything past olen untouched? */
+        if (buf[j] != 0xAA) { all = 0;
+          printf("    over-write at olen=%zu byte=%zu (=0x%02X)\n", olen, j, buf[j]); }
+    }
+  }
+  CHECK(all, "finalize touches only the requested outlen bytes (0xAA sentinel intact)");
+}
+
 /* --- §1d type 3: operational (midstate consumer path) --- */
 static void test_operational_midstate(void) {
   printf("[§1d type 3] operational: midstate leaf pattern\n");
@@ -101,11 +134,25 @@ static void test_dispatch(void) {
   printf("[R3 R7] probe / dispatch / forced-impl / gate\n");
 
   ub_cpu_features f = ub_detect_cpu();
-  printf("    probe: neon=%d sse41=%d avx2=%d\n", f.neon, f.sse41, f.avx2);
+  ub_cpu_info ci = ub_detect_cpu_info();
+  printf("    cpu: %s %s \"%s\"\n", ub_arch_name(ci.arch),
+         ub_vendor_name(ci.vendor), ci.brand);
+  if (ci.arch == UB_ARCH_X86_64)
+    printf("    x86 gen: family=%d model=0x%X stepping=%d\n",
+           ci.x86_family, ci.x86_model, ci.x86_stepping);
+  else if (ci.arch == UB_ARCH_AARCH64 && ci.arm_implementer)
+    printf("    arm gen: implementer=0x%02x part=0x%03x\n",
+           ci.arm_implementer, ci.arm_part);
+  printf("    isa flags: neon=%d sse41=%d avx2=%d avx512f=%d sha_ni=%d\n",
+         f.neon, f.sse41, f.avx2, f.avx512f, f.sha_ni);
 #if defined(__aarch64__) || defined(_M_ARM64)
   CHECK(f.neon == 1, "arm64 probe reports NEON present");
+  CHECK(ci.arch == UB_ARCH_AARCH64, "cpu-info reports aarch64 arch");
+  CHECK(ci.brand[0] != 0 && strcmp(ci.brand, "(unknown)") != 0,
+        "cpu-info reports a non-empty brand string");
 #else
   CHECK(1, "probe ran (x86/other: SIMD validation deferred to real hw)");
+  CHECK(ci.arch == UB_ARCH_X86_64, "cpu-info reports x86_64 arch");
 #endif
 
   int st = ub_selftest();
@@ -116,7 +163,12 @@ static void test_dispatch(void) {
   CHECK(def != UB_KERNEL_AUTO, "auto selection resolved to a concrete kernel");
 
   /* Force each kernel; verify it produces oracle-correct output. */
-  const ub_kernel_id ids[] = { UB_KERNEL_REF, UB_KERNEL_REF_UNROLLED };
+  const ub_kernel_id ids[] = {
+    UB_KERNEL_REF, UB_KERNEL_REF_UNROLLED,
+#if defined(__aarch64__) || defined(_M_ARM64)
+    UB_KERNEL_NEON,
+#endif
+  };
   for (size_t i = 0; i < sizeof(ids)/sizeof(ids[0]); ++i) {
     int fk = ub_force_kernel(ids[i]);
     char label[64];
@@ -138,6 +190,7 @@ int main(void) {
   printf("state size=%zu align=%zu\n\n", ub_state_size(), ub_state_align());
   test_abc_vector();
   test_reference_agreement();
+  test_output_bounds();
   test_operational_midstate();
   test_dispatch();
   printf("\n=== %s (%d failure%s) ===\n",

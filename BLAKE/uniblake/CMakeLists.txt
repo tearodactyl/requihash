@@ -26,8 +26,11 @@ endif()
 add_library(uniblake STATIC
   src/ub_core.c
   src/ub_const.c
+  src/ub_selftest.c
+  src/ub_snapshot.c
   src/kernel_ref.c
   src/kernel_ref_unrolled.c
+  src/kernel_neon.c
   src/ub_probe.c
   src/ub_oracle.c
 )
@@ -73,6 +76,28 @@ add_test(NAME ub_force_ref COMMAND ub_test)
 set_tests_properties(ub_force_ref PROPERTIES ENVIRONMENT "UB_FORCE_IMPL=ref")
 add_test(NAME ub_force_unrolled COMMAND ub_test)
 set_tests_properties(ub_force_unrolled PROPERTIES ENVIRONMENT "UB_FORCE_IMPL=ref_unrolled")
+
+# Stress test (U2): every kernel vs oracle across a large battery.
+add_executable(ub_stress tests/ub_stress.c)
+target_link_libraries(ub_stress PRIVATE uniblake)
+target_include_directories(ub_stress PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME ub_stress COMMAND ub_stress)
+
+# Snapshot validation (U3).
+add_executable(ub_snapshot_test tests/ub_snapshot_test.c)
+target_link_libraries(ub_snapshot_test PRIVATE uniblake)
+target_include_directories(ub_snapshot_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME ub_snapshot COMMAND ub_snapshot_test)
+
+# Dispatch-cost benchmark (U1). Plain executable, not a ctest.
+add_executable(ub_bench tests/ub_bench.c)
+target_link_libraries(ub_bench PRIVATE uniblake)
+target_include_directories(ub_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Kernel speed benchmark (U2): compare registered kernels head-to-head.
+add_executable(ub_kbench tests/ub_kbench.c)
+target_link_libraries(ub_kbench PRIVATE uniblake)
+target_include_directories(ub_kbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Gate-rejection test: only meaningful with the broken kernel compiled.
 if(UB_ENABLE_BROKEN_KERNEL)

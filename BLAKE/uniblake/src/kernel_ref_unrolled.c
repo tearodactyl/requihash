@@ -8,6 +8,32 @@
  * itself. It must produce byte-identical output to `ref` — an
  * expression change, not an algorithmic one (§1d) — which the oracle
  * gate proves. Not a performance claim; a dispatch-plumbing witness.
+ *
+ * It happens to be the fastest kernel on the M4 dev box (~92 ns/leaf),
+ * but that is ONE machine / compiler / build (M4, clang 21, -O2) — by
+ * this repo's own rule (`Req/BENCH.md` §4a, Platforms.md §6) that is an
+ * anecdote, not a portable fact, and a surprising scalar-form win is
+ * exactly the case that must be re-measured before it means anything.
+ * OPEN follow-on: full multi-platform benchmark — at minimum {x86_64
+ * Linux gcc+clang, arm64 Linux/Graviton, Windows MSVC} × {-O2,-O3} via
+ * `ub_kbench` (which prints the CPU line). Until then `ref` stays the
+ * default and this kernel's speed edge is unverified.
+ *
+ * Language level: plain C99, the project pin (CMakeLists.txt
+ * `set(CMAKE_C_STANDARD 99)`; also stated in BUILD.md). No intrinsics,
+ * builtins, or attributes — so this kernel is the most portable of all,
+ * building anywhere a C99 compiler exists. The five C99 features it
+ * uses, and the minimum toolchains that provide them:
+ *   1. `static inline` functions (`g`, `round_fn`) — GCC 3.1+, any
+ *      Clang, MSVC 2015+ (VS14; earlier MSVC lacked C `inline`).
+ *   2. mixed declarations and statements (locals declared where used).
+ *   3. `for`-loop initial declarations (`for (size_t b = 0; ...)`).
+ *   4. `//` line comments.
+ *   5. `<stdint.h>` fixed-width types (`uint64_t`, `uint8_t`).
+ * Expected vs. actual: GCC ≥ 3.1, Clang (all releases), MSVC ≥ 2015,
+ * ICC/ICX, and any modern cross-toolchain compile it unchanged; the
+ * only real-world compiler that would choke is pre-2015 MSVC (C89-only
+ * for C), which is out of scope (BUILD.md targets VS2022).
  */
 #include "ub_internal.h"
 

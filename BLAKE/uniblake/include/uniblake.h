@@ -31,8 +31,19 @@ enum {
  * The caller never sees the field layout. Size is reported at runtime
  * by ub_state_size() so a consumer allocating N states does not bake
  * in a compile-time sizeof that could desynchronize from the library.
- * A generously-sized aligned blob is provided for stack/embedded use;
- * ub_state_size() asserts it fits.
+ *
+ * STORAGE IS THE CALLER'S CHOICE — and the library is indifferent to
+ * it. A ub_state (and therefore its internal `buf`) may live on the
+ * stack (`ub_state s;`), on the heap (`malloc(ub_state_size())`), or in
+ * static storage; the API only ever takes `ub_state *`, never copies it
+ * by value, and holds no pointers into it across calls. So "is buf
+ * static/heap/stack?" is not a correctness question here — there is no
+ * hidden aliasing, no internal allocation, and no lifetime the caller
+ * doesn't control. The only requirements are alignment (ub_state_align)
+ * and that the storage outlives the hashing sequence. The one caveat
+ * that IS the caller's: a ub_state holds no lock, so a single instance
+ * must not be updated from two threads at once (per-thread copies via
+ * ub_blake2b_copy are the intended concurrency model).
  */
 typedef struct ub_state ub_state;
 
@@ -64,6 +75,39 @@ int ub_blake2b_copy(ub_state *dst, const ub_state *src);
 int ub_blake2b(void *out, size_t outlen, const void *in, size_t inlen,
                const uint8_t personal[UB_BLAKE2B_PERSONALBYTES]);
 
+/* --- state snapshot: versioned export / import (§4) ---
+ *
+ * Distinct from ub_blake2b_copy (which copies the LIVE struct): a
+ * snapshot is a versioned, format-stable WIRE image of the midstate,
+ * portable across kernels and (within version rules) across releases.
+ * Export a prefix-absorbed state once; import it repeatedly to seed
+ * many finalizations, including across processes or persistence.
+ */
+
+/* Bytes needed for a snapshot (current format). Runtime-reported. */
+size_t ub_snapshot_size(void);
+
+/* Serialize S into `out` (>= ub_snapshot_size() bytes). Returns 0, or
+ * -1 if out is NULL / too small. */
+int ub_blake2b_export(const ub_state *S, uint8_t *out, size_t outcap);
+
+/* Import result codes: distinguish "not a snapshot" from "a snapshot I
+ * can't read", so a caller never silently misreads (§4). */
+typedef enum {
+  UB_IMPORT_OK = 0,
+  UB_IMPORT_EBADARG,    /* NULL args */
+  UB_IMPORT_ETRUNCATED, /* input shorter than the declared format */
+  UB_IMPORT_EMAGIC,     /* not a uniblake snapshot */
+  UB_IMPORT_EFAMILY,    /* wrong hash family (e.g. a BLAKE3 snapshot) */
+  UB_IMPORT_EVERSION,   /* uniblake snapshot, unsupported format version */
+  UB_IMPORT_ECORRUPT    /* header ok but body fields out of range */
+} ub_import_rc;
+
+/* Reconstruct a live state from a snapshot. Returns UB_IMPORT_OK, or a
+ * specific nonzero code — a version/family mismatch is a loud error,
+ * never a silent misread. */
+int ub_blake2b_import(ub_state *S, const uint8_t *in, size_t inlen);
+
 /* --- dispatch / registration / forced-impl (R3 ⊇ R7) --- */
 
 /* Kernel identifiers. Extend as SIMD kernels land (U2). */
@@ -71,6 +115,7 @@ typedef enum {
   UB_KERNEL_AUTO = 0,   /* CPU probe selects (default) */
   UB_KERNEL_REF,        /* portable scalar reference */
   UB_KERNEL_REF_UNROLLED, /* experimental unrolled scalar */
+  UB_KERNEL_NEON,       /* AArch64 NEON (present only on aarch64 builds) */
   UB_KERNEL__COUNT
 } ub_kernel_id;
 

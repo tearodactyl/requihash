@@ -26,6 +26,10 @@ first, every time.
   `BLAKE/vendor/blake2/` the canonical vendored implementation every
   C/C++ consumer builds against (repo-relative, no absolute paths),
   `BLAKE/RFC/` the RFC 7693 copy with extracted, validated sample code.
+  `BLAKE/UniBlake.md` is the unified-BLAKE2/3 design; `BLAKE/uniblake/`
+  its built PoC (see that dir's `STATUS.md`/`PACKAGING.md`);
+  `BLAKE/Platforms.md` the x86-SIMD/NEON instruction-family + hardware
+  reference behind the SIMD targeting decisions.
 
 | Directory | Role | Contains |
 |---|---|---|

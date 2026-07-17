@@ -6,3 +6,5 @@ Req/*/target/
 Req/SOLVER_CORPUS/*/build/
 Req/SOLVER_CORPUS/*/target/
 prompt.txt
+.DS_Store
+**/.DS_Store

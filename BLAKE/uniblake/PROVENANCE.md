@@ -62,9 +62,29 @@ external input; everything else is original code authored in this repo.
   dropped) to prove the gate rejects a bad kernel.
 - `CMakeLists.txt`, `BUILD.md`, `PLAN.md`, this file — original.
 
+### `vendor/neon/blake2b-round.h`, `vendor/neon/blake2b-load-neon.h`
+
+- **Mode: plugged in** (vendored-unmodified) — the NEON round macros
+  (G1/G2, DIAGONALIZE, `vext`-based rotations) and message-permutation
+  load macros, used by the `neon` compress kernel (U2).
+- **Upstream**: BLAKE2/BLAKE2 package `neon/` subdirectory, Samuel
+  Neves et al., CC0/OpenSSL/Apache-2.0. Pinned commit `ed1974e`
+  (2023-02-12) — the same pin as the scalar reference (`../BLAKE.md`
+  §0). This is the §1c **single NEON donor**.
+- **How used**: `src/kernel_neon.c` `#include`s both headers unmodified
+  and calls the donor's `ROUND(r)` macro; the compress body's
+  state-setup (loading `S->h/t/f` into NEON rows, the final xor-store)
+  mirrors the donor's `blake2b_compress` exactly. Only the surrounding
+  multi-block kernel signature is ours (**rewritten from**, deviation:
+  the `(state, blocks, nblocks)` seam vs. the donor's single-block
+  `blake2b_compress`). No algorithmic change — the rounds, rotations,
+  and message schedule are the donor's. **Proven** byte-for-byte
+  against the scalar oracle by the stress test (3021 checks) and the
+  self-test gate.
+
 ## Not yet present (future phases, will extend this manifest)
 
-- SIMD kernels (U2): donors per `../UniBlake.md` §1c/§2b — libsodium
-  AVX2 compress TUs (x86), BLAKE2 package `neon/` (NEON). Each will be
-  pinned here in its mode when adopted.
+- x86 SIMD kernels (U2 continued): donors per `../UniBlake.md` §1c/§2b
+  — libsodium AVX2 compress TUs (x86 single-donor). Pinned here when
+  adopted (needs real x86 to validate/measure — A7).
 - BLAKE3 (U6): official BLAKE3 C, vendored, pinned when adopted.

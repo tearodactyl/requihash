@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 /* --- opaque-state size/alignment (anti-pattern #1 defense) --- */
 size_t ub_state_size(void)  { return sizeof(struct ub_state); }
@@ -31,6 +32,9 @@ typedef struct {
 static ub_kernel_entry g_kernels[] = {
   { UB_KERNEL_REF,          "ref",          ub_compress_ref,          1 },
   { UB_KERNEL_REF_UNROLLED, "ref_unrolled", ub_compress_ref_unrolled, 1 },
+#if defined(__aarch64__) || defined(_M_ARM64)
+  { UB_KERNEL_NEON,         "neon",         ub_compress_neon,         1 },
+#endif
 };
 static const size_t g_nkernels = sizeof(g_kernels) / sizeof(g_kernels[0]);
 
@@ -52,63 +56,56 @@ static ub_kernel_entry *find_kernel(ub_kernel_id id) {
 }
 
 /* --- probe → default kernel choice ---
- * PoC has only scalar kernels, so AUTO resolves to ref regardless of
- * the probe result; the probe is still run and reported (proving
- * detection works) and is the hook U2's SIMD selection plugs into. */
+ * AUTO consults the probe, but availability alone does NOT make a SIMD
+ * kernel the default — it must be measured to win on THIS core (§1c:
+ * "beats or ties portable on its hardware, else stays off"). And "its
+ * hardware" means the specific microarchitecture, not just the ISA:
+ * the same NEON code is faster than scalar on some aarch64 cores and
+ * slower on others (Platforms.md §5 — Cortex-A53 vs A57; M-series vs
+ * A9). So selection consults the full ub_cpu_info (vendor + generation
+ * coordinates), not merely the ISA flags.
+ *
+ * The selection model is an explicit **per-microarchitecture win-list**:
+ * a SIMD kernel is auto-selected only where it has been MEASURED to win
+ * on that class of core. Everywhere else, the portable scalar `ref` is
+ * the default — the safe, never-slower floor.
+ *
+ * MEASURED so far (U2 kbench): Apple M-series (strong scalar) → NEON is
+ * 0.55–0.70x, a LOSS, so scalar wins. No aarch64 core is yet on the
+ * NEON win-list (weaker in-order cores like Cortex-A53 are the expected
+ * first entries, but not measured by us — do not add on expectation).
+ *
+ * A chosen kernel that failed the gate never reaches here — ensure_init
+ * runs the gate first. */
 static ub_kernel_id choose_kernel_from_cpu(void) {
   ub_cpu_features f = ub_detect_cpu();
-  (void)f; /* no SIMD kernels yet; U2 consults f here */
+  ub_cpu_info     ci = ub_detect_cpu_info();
+  (void)f;
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+  /* NEON win-list (empty so far). Example of the intended shape, kept
+   * as a comment until a real measurement fills it:
+   *   if (ci.vendor == UB_VENDOR_ARM && is_weak_inorder(ci.arm_part))
+   *       return UB_KERNEL_NEON;
+   * Apple M-series is explicitly NOT on it (measured loss). */
+  (void)ci;
+#endif
+  /* x86 AVX2/SSE4.1 kernels (U2 continued) will consult f.avx2/f.sse41
+   * and ci (family/model) here once written + measured. */
   return UB_KERNEL_REF;
 }
 
 /* --- the oracle self-test gate (§5) ---
- * Every available kernel must reproduce the oracle's bytes across a
- * fixed battery, or it is rejected. Returns 0 if all pass, else
- * -(id) of the first failing kernel. A forced kernel that fails here
- * is refused by ub_force_kernel — forcing never bypasses the gate. */
-static int selftest_kernel(ub_kernel_entry *k);
-
+ * Every available kernel must reproduce the oracle's bytes across the
+ * shared battery (ub_kernel_matches_oracle, ub_selftest.c), or it is
+ * rejected. Returns 0 if all pass, else -(id) of the first failing
+ * kernel. A forced kernel that fails is refused by ub_force_kernel —
+ * forcing never bypasses the gate. */
 int ub_selftest(void) {
   for (size_t i = 0; i < g_nkernels; ++i) {
     if (!g_kernels[i].available) continue;
-    if (selftest_kernel(&g_kernels[i]) != 0)
+    if (ub_kernel_matches_oracle(g_kernels[i].fn) != 0)
       return -(int)g_kernels[i].id;
-  }
-  return 0;
-}
-
-/* Forward decls of the streaming primitives used by the self-test. */
-static int ub_init_with(struct ub_state *S, size_t outlen,
-                        const uint8_t *personal, ub_compress_fn fn);
-static int ub_update_with(struct ub_state *S, const void *in, size_t inlen,
-                          ub_compress_fn fn);
-static int ub_final_with(struct ub_state *S, void *out, size_t outlen,
-                         ub_compress_fn fn);
-
-/* Validate one kernel against the pristine oracle backend across a
- * battery spanning: empty, sub-block, exact block, multi-block,
- * unaligned tail, and personalized inputs (§1d oracle type 1). */
-static int selftest_kernel(ub_kernel_entry *k) {
-  static const size_t lens[] = { 0, 1, 55, 64, 127, 128, 129, 256, 1000 };
-  uint8_t in[1000];
-  for (size_t i = 0; i < sizeof in; ++i) in[i] = (uint8_t)(i * 131 + 7);
-  const uint8_t persona[16] = { 'u','n','i','b','l','a','k','e',
-                                '-','s','e','l','f','t','s','t' };
-
-  for (size_t p = 0; p < 2; ++p) {
-    const uint8_t *pers = p ? persona : 0;
-    for (size_t li = 0; li < sizeof(lens) / sizeof(lens[0]); ++li) {
-      size_t n = lens[li];
-      uint8_t got[64], want[64];
-
-      struct ub_state S;
-      if (ub_init_with(&S, 64, pers, k->fn) != 0) return -1;
-      if (ub_update_with(&S, in, n, k->fn) != 0) return -1;
-      if (ub_final_with(&S, got, 64, k->fn) != 0) return -1;
-
-      ub_oracle_blake2b(want, 64, in, n, pers);
-      if (memcmp(got, want, 64) != 0) return -1;
-    }
   }
   return 0;
 }
@@ -155,7 +152,7 @@ int ub_force_kernel(ub_kernel_id id) {
   ub_kernel_entry *k = find_kernel(id);
   if (!k) return -1;
   /* Forcing selects — but never bypasses the gate (§5). */
-  if (selftest_kernel(k) != 0) return -1;
+  if (ub_kernel_matches_oracle(k->fn) != 0) return -1;
   g_active_fn   = k->fn;
   g_active_id   = k->id;
   g_initialized = 1;
@@ -171,8 +168,8 @@ static void inc_counter(struct ub_state *S, uint64_t inc) {
   S->t[1] += (S->t[0] < inc);
 }
 
-static int ub_init_with(struct ub_state *S, size_t outlen,
-                        const uint8_t *personal, ub_compress_fn fn) {
+int ub_init_with(struct ub_state *S, size_t outlen,
+                 const uint8_t *personal, ub_compress_fn fn) {
   (void)fn;
   if (!outlen || outlen > UB_BLAKE2B_OUTBYTES) return -1;
 
@@ -180,11 +177,13 @@ static int ub_init_with(struct ub_state *S, size_t outlen,
    * 7693 §2.8: digest_length, key_length, fanout, depth at bytes 0..3;
    * personal at bytes 48..63. Sequential-mode (fanout=depth=1). */
   uint8_t P[64];
-  memset(P, 0, sizeof P);
+  memset(P, 0, sizeof P);       /* bounded: fixed 64-byte local */
   P[0] = (uint8_t)outlen; /* digest_length */
   P[1] = 0;               /* key_length */
   P[2] = 1;               /* fanout */
   P[3] = 1;               /* depth */
+  /* personal is exactly 16 B by contract; the 16-byte copy lands at
+   * P[48..63], inside the 64-byte block. */
   if (personal) memcpy(P + 48, personal, 16);
 
   memset(S, 0, sizeof *S);
@@ -194,15 +193,22 @@ static int ub_init_with(struct ub_state *S, size_t outlen,
   return 0;
 }
 
-static int ub_update_with(struct ub_state *S, const void *pin, size_t inlen,
-                          ub_compress_fn fn) {
+int ub_update_with(struct ub_state *S, const void *pin, size_t inlen,
+                   ub_compress_fn fn) {
   const uint8_t *in = (const uint8_t *)pin;
   if (inlen == 0) return 0;
 
   size_t left = S->buflen;
+  /* Invariant: buflen never exceeds the block size between calls.
+   * asserts compile out under -DNDEBUG (release); in a debug build a
+   * broken invariant trips here instead of silently overflowing buf. */
+  assert(left <= UB_BLOCKBYTES);
   size_t fill = UB_BLOCKBYTES - left;
   if (inlen > fill) {
     S->buflen = 0;
+    /* bounded: left + fill == UB_BLOCKBYTES, so this fills buf exactly
+     * to its end and no further. */
+    assert(left + fill == UB_BLOCKBYTES);
     memcpy(S->buf + left, in, fill);
     inc_counter(S, UB_BLOCKBYTES);
     fn(S, S->buf, 1);
@@ -216,23 +222,39 @@ static int ub_update_with(struct ub_state *S, const void *pin, size_t inlen,
       in += UB_BLOCKBYTES; inlen -= UB_BLOCKBYTES;
     }
   }
+  /* bounded: after the branch above, inlen <= UB_BLOCKBYTES and
+   * buflen == 0 (if the branch ran) or the original left (if it did
+   * not, in which case inlen <= fill), so buflen + inlen <= 128 — the
+   * copy stays inside buf. This is the one runtime-sized copy the
+   * public API does not pre-check, so it is asserted. */
+  assert(S->buflen + inlen <= UB_BLOCKBYTES);
   memcpy(S->buf + S->buflen, in, inlen);
   S->buflen += inlen;
   return 0;
 }
 
-static int ub_final_with(struct ub_state *S, void *out, size_t outlen,
-                         ub_compress_fn fn) {
+int ub_final_with(struct ub_state *S, void *out, size_t outlen,
+                  ub_compress_fn fn) {
+  /* Public bounds contract: out must be non-NULL and the caller's
+   * buffer at least S->outlen bytes. Violations return -1 (caller
+   * error), NOT an assert — these are external-input checks, kept in
+   * release builds. */
   if (out == NULL || outlen < S->outlen) return -1;
   if (is_lastblock(S)) return -1;
 
   inc_counter(S, S->buflen);
   set_lastblock(S);
+  /* bounded: buflen <= 128 (update's invariant), so the pad length
+   * 128-buflen is in [0,128] and the memset stays inside buf. */
+  assert(S->buflen <= UB_BLOCKBYTES);
   memset(S->buf + S->buflen, 0, UB_BLOCKBYTES - S->buflen);
   fn(S, S->buf, 1);
 
   uint8_t buffer[64] = {0};
   for (int i = 0; i < 8; ++i) ub_store64(buffer + i * 8, S->h[i]);
+  /* bounded: outlen <= 64 (enforced at init) and buffer is 64 B, and
+   * the caller's out was checked >= S->outlen above. */
+  assert(S->outlen <= UB_BLAKE2B_OUTBYTES);
   memcpy(out, buffer, S->outlen);
   return 0;
 }
@@ -259,6 +281,7 @@ int ub_blake2b_final(ub_state *S, void *out, size_t outlen) {
 
 int ub_blake2b_copy(ub_state *dst, const ub_state *src) {
   if (!dst || !src) return -1;
+  /* bounded: exact struct-sized copy (the midstate clone). */
   memcpy(dst, src, sizeof *dst);
   return 0;
 }

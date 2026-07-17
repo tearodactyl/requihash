@@ -104,6 +104,63 @@ plausible. **Standing rule: any new peak-memory figure gets the same
 two-instrument cross-check before being written into a `STATUS.md` or
 baseline file as a trusted number**, not just the counting allocator alone.
 
+## 4a. Compare equal work, and verify the comparison in the disassembly
+
+The cautionary precedent (uniblake U1, 2026-07-16, `BLAKE/uniblake/`):
+a benchmark meant to measure the cost of one variable — routing each
+BLAKE2b compress through a dispatch function pointer vs. calling it
+directly — first reported the dispatched path as **15% FASTER**, a
+physically impossible "negative cost" for adding an indirection.
+
+**What actually happened.** The two paths were not doing equal work.
+"Path A" ran the full streaming API through the compiled library; "Path
+B", labelled *inlined*, ran hand-written `static` wrapper functions in
+the benchmark's own translation unit. Three confounds rode along
+unnoticed: (1) B's wrappers were **not actually inlined** — the
+disassembly showed them as real `t`-symbol functions, so "inlined" was
+a false label; (2) the two paths copied the midstate differently
+(`memcpy` vs. struct assignment); (3) the compiler allocated registers
+and optimized the *loop around* each path differently. The −15% was
+measuring **incidental codegen differences between two non-equivalent
+implementations of the same algorithm**, not the indirection. The
+dispatched side came out ahead essentially by accident of how each
+side's surrounding code happened to compile.
+
+**The fix, and the corrected result.** Rewrite so the *only* difference
+between the two timed paths is the one variable under test: same call
+site, same surrounding loop, same work — direct `f(x)` vs. `(*fp)(x)`
+where `fp` is laundered through a `volatile` so the compiler cannot
+devirtualize it (which is the real shipped situation — the pointer is
+chosen at runtime by the CPU probe). Re-measured, the dispatch tax was
+**+0.25 to +0.68% per compress** — a small positive cost, as physics
+requires, and negligible on this workload.
+
+**Standing rules this motivates:**
+
+1. **Sanity-check the sign and magnitude first.** A result that
+   contradicts a hard prior (adding work made it faster; a wider SIMD
+   path is 3× slower with no explanation) is a **measurement bug until
+   proven otherwise**, not a discovery. Investigate before recording.
+2. **Isolate one variable.** Two timed paths must differ in exactly the
+   thing under test and be identical in everything else (allocation,
+   copy method, call-site shape, surrounding loop). If you can't state
+   the single difference in one sentence, the benchmark isn't ready.
+3. **Verify the comparison in the disassembly / symbol table when the
+   claim depends on codegen.** "Inlined vs. not", "vectorized vs. not",
+   "devirtualized vs. not" are checkable facts (`objdump`, `nm`), not
+   assumptions to label by intent. The −15% would have been caught
+   immediately by noticing B's wrappers were real symbols.
+4. **Defeat the optimizer deliberately when modelling runtime
+   behavior.** If the shipped code makes a choice at runtime (a probed
+   function pointer), the benchmark must prevent the compiler from
+   resolving it at compile time (`volatile`, or a value the compiler
+   can't trace), or it measures a faster path than production runs.
+5. **Keep the wrong result on the record.** The discarded −15% and why
+   it was wrong stay written down (here and in the uniblake STATUS
+   findings) — a benchmark that was believed and then corrected is more
+   instructive than one that was simply right, and stops the same trap
+   being re-fallen-into.
+
 ## 5. Window/parameter reporting
 
 Perf.md §2's whole bucket-breakdown table is uninterpretable without its

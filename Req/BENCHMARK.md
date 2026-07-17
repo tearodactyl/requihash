@@ -254,41 +254,19 @@ the default verifier; the reference solver/verifier stay as the equivalence orac
 
 ### 7a. Intel generation-to-ISA map, for whenever an x86 leg is run
 
-Confirmed from Intel's own documentation and generation-specific coverage,
-not assumed — matters for §7's x86 caveat because "x86 has AVX-512" is not
-a safe blanket assumption on real deployed hardware:
+The full Intel-generation → ISA timeline (which silicon has SSE/AVX2/
+AVX-512, the Alder-Lake fuse-off, the per-core hybrid complication, and
+why **AVX2 is the realistic universal x86 SIMD floor** for consumer
+hardware) now lives in **[`../BLAKE/Platforms.md`](../BLAKE/Platforms.md)
+§2** — the single home for x86 instruction-family detail, so it isn't
+duplicated and drifting across docs.
 
-| Generation (Intel codename) | Year | SSE2/4.1/4.2 | AVX2 | AVX-512 |
-|---|---|---|---|---|
-| Pentium 4 onward | 2001+ | SSE2 yes | no | no |
-| Nehalem (1st Core i-series) | 2008 | SSE4.1/4.2 yes | no | no |
-| Haswell | 2013 | yes | **yes, first gen** | no |
-| Skylake (client) | 2015 | yes | yes | no (client); Skylake-X/-SP (server/HEDT) added AVX-512, 2017 |
-| Ice Lake (client + server) | 2019/2021 | yes | yes | **yes, both client and server** |
-| Alder Lake (12th gen) onward, client | 2021+ | yes | yes | **fused off entirely**, even on P-cores — Intel disabled it chip-wide because the E-cores can't execute it and mixed P/E scheduling with an E-core-incompatible instruction set was unworkable; some early boards allowed re-enabling via BIOS (disable E-cores), later steppings fused it off in silicon |
-| Sapphire Rapids / Emerald Rapids / Granite Rapids (server, P-core-only Xeon lines) | 2023-2024 | yes | yes | **yes** — server P-core Xeon lines kept it throughout |
-| Sierra Forest (server, E-core-only Xeon line) | 2024 | yes | yes | **no** — the E-core Xeon line skips AVX-512 entirely, relies on AVX10 instead (same underlying tension as Alder Lake's client E-cores, resolved by omission rather than a chip-wide fuse-off since this line has no P-cores to conflict with) |
-| Nova Lake (client, upcoming) | ~2026 | yes | yes | **returning, via AVX10.2** — the first consumer line planned to unify P-core and E-core execution at full 512-bit width, ending the Alder-Lake-era fuse-off |
-
-**Per-core support is the real complication, not just per-generation.**
-From Alder Lake (2021) through whatever ships before Nova Lake, a "modern
-Intel laptop" is not a single ISA target: it's a hybrid chip where the
-P-cores are AVX-512-*capable* silicon that Intel deliberately disabled at
-the chip level, specifically because the E-cores sharing the same package
-cannot execute AVX-512 at all and the OS scheduler has no reliable way to
-pin AVX-512-issuing threads to P-cores only. This is a scheduling/
-compatibility decision, not a silicon limitation on the P-cores
-themselves — relevant here because a `blake2b_simd`-style runtime
-`is_x86_feature_detected!` check will correctly report "no AVX-512" on
-these chips (the CPUID bit is fused off), so no code needs special-casing
-for it, but it explains *why* the AVX2 tier (client Skylake through
-current Alder-Lake-generation laptops) is the realistic universal x86
-SIMD floor to benchmark against for a consumer-hardware target — not
-AVX-512, even though some of that same silicon generation has AVX-512
-present and working on the *server* side (Sapphire/Emerald/Granite
-Rapids). AVX10.2 (Nova Lake onward) is the intended long-term fix —
-unifying P-core and E-core execution at the same vector width — but isn't
-shipping hardware yet as of this check.
+The one fact §7 needs inline: **"x86 has AVX-512" is not a safe blanket
+assumption** — AVX2 is universal only from Haswell (2013) on, and
+AVX-512 is fused off on current Intel client chips — so an x86 SIMD leg
+should benchmark against the **AVX2** tier as the floor, and treat
+AVX-512 as opportunistic. A runtime feature check reports the truth per
+CPU, so no code special-cases it.
 
 ## 8. Harness fitness for per-component iterative optimization (reviewed)
 

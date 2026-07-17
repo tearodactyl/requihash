@@ -71,8 +71,9 @@ consumes this spec and adds nothing to it.
 - `keying ∈ {regular, single}`: `regular` is the Tang–Sun–Gong repair (leaves
   partitioned into `k` classes, restoring the k-list problem); `single` is
   classic single-list Equihash keying.
-- `context`: the domain-separation stem. This tree uses the 10-byte ASCII stem
-  `"ReqhashPoW"`. (Zcash's deployed Equihash uses a different personalization
+- `context`: the domain-separation stem. This tree uses the 6-byte ASCII stem
+  `"ReqPoW"`, followed by 4 reserved (zero) bytes held for future use, then the
+  parameter binding. (Zcash's deployed Equihash uses a different personalization
   layout — 8-byte stem, le32(n), le32(k) — and is *not* bit-compatible with this
   family; compatibility mode is out of scope for v1.)
 
@@ -83,11 +84,20 @@ digest-length convention, one workable choice among others). Only the first `n/8
 a design freedom flagged for review (a future revision may set digest length to
 `n/8`).
 
-**Personalization** (BLAKE2b 16-byte personal field):
+**Personalization** (BLAKE2b 16-byte personal field). Byte ranges are
+half-open `[start, end)` — start inclusive, end exclusive — so each
+range's length is `end − start`, and the four ranges tile bytes 0..15
+with no gap or overlap (6 + 4 + 4 + 2 = 16):
 
-    person[0..10] = context stem ("ReqhashPoW")
-    person[10..14] = le32(n)
-    person[14..16] = le16(k)
+    person[0..6)   = context stem "ReqPoW"   (6 bytes)
+    person[6..10)  = reserved, all-zero      (4 bytes, future use)
+    person[10..14) = le32(n)                 (4 bytes)
+    person[14..16) = le16(k)                 (2 bytes)
+
+Built in code by `Req/rust`'s generator and, for the C primitive, by
+`BLAKE/uniblake/`'s `ub_init_with` (which copies the 16-byte block to
+the BLAKE2b param block at bytes 48..63; RFC 7693 §2.8). See the ASCII
+diagram in `Req/rust/src/probe.rs` / this section for the visual layout.
 
 **Base state** (shared by all leaves of one attempt):
 

@@ -168,6 +168,15 @@ measure it, before the next. The same discipline applies to **NEON**
 (the BLAKE2 package's `neon/` TU is the single obvious donor; adopt one
 tier, validate, measure, then consider more).
 
+**Which ISA tiers to target, and what to expect on real hardware, is a
+reference of its own: [`Platforms.md`](Platforms.md)** — the x86 SIMD
+family timeline (SSE2→AVX2→AVX-512→AVX10), NEON, what's present on
+2020+ laptops/servers, and the backward-compatibility rules. The short
+version it justifies: build a portable scalar baseline + an **AVX2**
+x86 fast path + a **NEON** ARM path; treat AVX-512 as opportunistic and
+AVX10 as not-yet; and **measure before defaulting** (the NEON result in
+`uniblake/STATUS.md` is the cautionary case — present ≠ faster).
+
 Rationale: a single donor per SIMD family keeps provenance narrow (one
 commit to pin per family, §1a) and technique consistent (§2b's
 rot24/rot16 quality tell applies uniformly), and incremental adoption
@@ -336,13 +345,19 @@ are catalogued for R6 but not adopted this pass.
 
 ### x86 / NEON optimization breadth and quality, per implementation
 
+*What the ISA abbreviations mean, when each shipped, and what to expect
+on real hardware is the job of [`Platforms.md`](Platforms.md) — this
+table is a per-donor **capability survey** for UniBlake's sourcing
+decision, not an ISA primer. The quality tell for BLAKE2b (byte-permute
+rotations vs. shift-OR; lane count) and the "2-lane vs. strong scalar"
+effect are defined there.*
+
 Assessment method, stated: (1) ISA inventory from source; (2) technique
-inspection — the quality tell for BLAKE2b is how rot24/rot16 are done
-(byte-permute `pshufb`/`tbl` = good; shift-OR emulation = slow) and
-whether 4×64-bit lanes are used (AVX2/128-bit = 2 lanes); (3) selection
-mechanism soundness; (4) our own measurements where hardware exists
-(aarch64 done — `vendor/blake2-rs/README.md`; x86 gated on A7); (5)
-upstream fix history.
+inspection (rotation method + lane count, per `Platforms.md`); (3)
+selection mechanism soundness; (4) our own measurements where hardware
+exists (aarch64 done — `vendor/blake2-rs/README.md` and the U2 NEON
+result in `uniblake/STATUS.md`; x86 gated on A7); (5) upstream fix
+history.
 
 | Implementation | x86 breadth/quality | NEON breadth/quality |
 |---|---|---|
@@ -506,11 +521,23 @@ The early phases are *infrastructure* (the same class as reqbench and
 Seam A — built before campaigns, justified by making experiments cheap
 and uniform). SIMD tuning is *optimization-stage* and stays gated on
 measurements — this proposal re-homes rather than reverses the A13
-verdict. UniBlake is the **hash-track** focus; it must not displace
-A5 (TMTO steepness) as the **solver-track** priority — hashing is ~17%
-of solve time, the steepness science is the program's core question,
-and the two tracks share no code. Run in parallel, solver track first
-when forced to choose.
+verdict.
+
+**Track independence (BLAKE work is not gated by the security
+derivations).** UniBlake is the **hash-track**; A5 (TMTO steepness) and
+the wider Equihash/Sequihash security-derivation work are the
+**solver-track**. The two share no code and no build, and — the point
+being made explicit here — **neither sequences nor gates the other**.
+BLAKE work proceeds on its own merits and its own schedule; it does not
+wait on, and is not subordinated to, the steepness/security math, and
+that math does not wait on the hash work. An earlier version of this
+section ranked the solver track first "when forced to choose"; that
+subordination is withdrawn — there is no forced choice, because the
+tracks are independent. They run in parallel by owner priority, not by
+a standing precedence rule. (Context for why they were ever mentioned
+together: hashing is ~17% of solve time, so hash performance is a minor
+input to solver measurements — a *data* relationship, not a dependency
+that constrains BLAKE's own progress.)
 
 ### Phase table
 

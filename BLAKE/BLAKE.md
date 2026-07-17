@@ -386,20 +386,17 @@ implementations**: the official package's `neon/` directory
 (`blake2b-neon.c` + load headers, Neves lineage — ARMv7 and AArch64)
 and Crypto++'s BLAKE2 NEON path (Walton/Neves); BLAKE3's NEON kernel
 ships in its official implementations (a different hash, listed for
-contrast); libsodium and OpenSSL carry none. **Why AArch64 headroom is
-modest, and why the implementations exist anyway**: BLAKE2b's state is
-4×4 u64, so 128-bit NEON registers hold 2 lanes; the 16/24-bit
-rotations vectorize cheaply (`tbl`/`ext`, analogous to SSSE3
-`pshufb`) but the diagonalization shuffles cost extra — while AArch64
-*scalar* is already strong (single-instruction `ror` on 64-bit GPRs,
-31 general registers). The NEON ports were written when the target was
-32-bit ARMv7, where scalar 64-bit arithmetic is genuinely expensive and
-NEON was a clear win; on AArch64 the published experience is mixed,
-including slower-than-scalar reports on some cores. Implementations
-exist for good historical reasons; the marginal-on-AArch64 expectation
-is a measurement question for the optimization stage (measure the
-package's `neon/` and a 2-way interleaved batch against
-`blake2b_simd`'s portable path and against BLAKE3, on the A5 harness).
+contrast); libsodium and OpenSSL carry none.
+
+The **why-AArch64-headroom-is-modest** analysis (2-lane NEON vs. strong
+AArch64 scalar; rotation-technique and diagonalization detail; the
+32-bit-ARMv7-origin of these ports) now lives in
+[`Platforms.md`](Platforms.md) §5, not restated here. **This question is
+no longer purely theoretical**: uniblake's U2 NEON kernel *measured* it
+on Apple M4 — NEON is 0.55–0.70× scalar (slower), exactly the predicted
+2-lane-vs-strong-scalar loss (`uniblake/STATUS.md`, `UniBlake.md` §2b).
+The remaining measurement questions (weaker aarch64 cores, interleaved
+batch) stay optimization-stage work.
 
 ### 5.3 Why tromp changed the struct and API, and the standard way now
 
@@ -423,6 +420,13 @@ portable RT build proves the algorithm runs fine on the standard
 struct). The batching is `blake2b_simd::many::hash_many` (Rust,
 runtime-dispatched, maintained) or Neves' own experimental
 `blake2-avx2` repo (C); BLAKE3 gets batching + tree parallelism natively.
+
+*uniblake's milder version of the same move*: its `ub_state` keeps the
+full `{h,t,f,buf,buflen,outlen}` but drops only the trailing `last_node`
+(sequential-only, no tree mode) — a small, safe scoping trim, not
+tromp's aggressive compaction, and safe for the same structural reason
+the RT build is: nothing outside the primitive depends on the layout
+(`uniblake/STATUS.md` finding 5, `uniblake/src/ub_internal.h`).
 
 **"If miners like it, why not us?" — we will, at the right stage.**
 The compact state and midstate batching are real wins, and miners keep
