@@ -125,7 +125,7 @@ int main(void) {
      * contents. */
     ub_state a, b;
     memset(&a, 0x00, sizeof a);      /* one target all-zero */
-    memset(&b, 0xEE, sizeof b);      /* the other all-0xEE (maximally different) */
+    memset(&b, 0x55, sizeof b);      /* the other all-0x55 = 0b01010101 */
     ub_blake2b_import(&a, snap, ub_snapshot_size());
     ub_blake2b_import(&b, snap, ub_snapshot_size());
     CHECK(memcmp(&a, &b, sizeof a) == 0,

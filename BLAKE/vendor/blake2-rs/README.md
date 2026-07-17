@@ -23,7 +23,7 @@ shadowing it would invite dependency confusion even though this crate is
 `../blake2/{blake2.h, blake2-impl.h, blake2b-ref.c}` — copied
 **unmodified** from `github.com/BLAKE2/BLAKE2` `ref/` at commit
 `ed1974e` (2023-02-12, upstream tip at vendoring; CC0 / OpenSSL /
-Apache-2.0), per `../blake2/PROVENANCE.md`. The same three files
+Apache-2.0), per `../uniblake/PROVENANCE.md`. The same three files
 `Req/SOLVER_CORPUS/rk/original/`, `cs/`, and `rz/`'s cross-check
 binaries compile. `csrc/blake2ref_glue.c` is this crate's own accessor
 file *over* that API (parameter-block init from `(outlen, personal)`,

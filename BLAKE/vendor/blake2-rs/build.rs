@@ -13,7 +13,7 @@ fn main() {
     let ref_c = vendor.join("blake2b-ref.c");
     assert!(
         ref_c.exists(),
-        "vendored blake2b-ref.c not found at {} (see BLAKE/vendor/blake2/PROVENANCE.md)",
+        "vendored blake2b-ref.c not found at {} (see BLAKE/uniblake/PROVENANCE.md)",
         ref_c.display()
     );
     cc::Build::new()

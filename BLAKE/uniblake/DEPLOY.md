@@ -1,7 +1,8 @@
-# uniblake — clone, build, and test on a fresh machine
+# uniblake — deploy: clone, build, and test on a fresh machine
 
 This is the "hand it to someone with a bare VPS or a fresh Windows box"
-guide. It covers cloning the repo and running the full validation on:
+guide — deploying the source onto a target and validating it there. It
+covers cloning the repo and running the full validation on:
 **Linux VPS (x86_64)**, **Windows 10 native**, **Windows 11 native**,
 and **WSL2**. For the deeper per-toolchain matrix (MinGW, cross-compile,
 endianness, MSVC specifics) see [BUILD.md](BUILD.md).

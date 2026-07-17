@@ -149,11 +149,15 @@ struct Params {
     size_t CompactWidth() const { return (size_t(1) << k) * CollisionBitLength() / 8; }
 
     void person(unsigned char out[16]) const {
-        const char* tag = "ReqhashPoW";  // 10 bytes; distinct from Equihash's "ZcashPoW\0\0"
-        memcpy(out, tag, 10);
+        // SPEC.md §3: "ReqPoW"(6) || reserved[6..10)=0 || le32(n) || le16(k).
+        // Distinct from Equihash's "ZcashPoW\0\0". The 4 reserved bytes are
+        // held zero for future use.
+        memset(out, 0, 16);
+        const char* tag = "ReqPoW";     // 6 bytes
+        memcpy(out, tag, 6);
+        // out[6..10) left zero (reserved)
         uint32_t nn = n, kk = k;
         for (int i = 0; i < 4; i++) out[10 + i] = (nn >> (8 * i)) & 0xFF;
-        // last 2 bytes hold low 16 bits of k (k < n <= ~2^? fits)
         out[14] = kk & 0xFF;
         out[15] = (kk >> 8) & 0xFF;
     }

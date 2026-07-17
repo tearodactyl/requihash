@@ -96,7 +96,7 @@ fn main() {
 
     // Vendored portable BLAKE2b (repo-relative, no machine-specific path);
     // RZ_BLAKE2_REF_DIR overrides for building against a different copy.
-    // Provenance: ../../../BLAKE/vendor/blake2/PROVENANCE.md.
+    // Provenance: ../../../BLAKE/uniblake/PROVENANCE.md.
     let blake2_ref_dir = match env::var("RZ_BLAKE2_REF_DIR") {
         Ok(dir) => PathBuf::from(dir),
         Err(_) => manifest_dir.join("../../../BLAKE/vendor/blake2"),
@@ -104,7 +104,7 @@ fn main() {
     let blake2b_ref_c = blake2_ref_dir.join("blake2b-ref.c");
     assert!(
         blake2b_ref_c.exists(),
-        "vendored blake2b-ref.c not found at {} (see BLAKE/vendor/blake2/PROVENANCE.md, \
+        "vendored blake2b-ref.c not found at {} (see BLAKE/uniblake/PROVENANCE.md, \
          or set RZ_BLAKE2_REF_DIR)",
         blake2b_ref_c.display()
     );

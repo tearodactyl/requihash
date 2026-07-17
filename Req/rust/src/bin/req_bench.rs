@@ -189,7 +189,7 @@ fn bench_hash_backends(n: u32, k: u32, out: &mut Vec<Record>) {
     use requihash::hash::{scalar::Blake2bScalar, simd::Blake2bSimd, LeafHasher};
     let p = Params::new(n, k).unwrap();
     let leaves = 1usize << (p.collision_bit_length() + 1);
-    let person = *b"ReqhashPoW\x00\x00\x00\x00\x05\x00";
+    let person = *b"ReqPoW\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00"; // "ReqPoW"(6)+reserved(4)+le32(0)+le16(5)... arbitrary fixed 16 B
     let prefix = b"bench-input\x00\x00\x00\x00";
     let keys: Vec<(u32, u32)> = (0..leaves as u32).map(|i| (i % k, i / k)).collect();
     let scalar = Blake2bScalar::new();

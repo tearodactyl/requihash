@@ -12,14 +12,15 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# The repository's canonical portable BLAKE2b (BLAKE/vendor/blake2,
-# PROVENANCE.md there); -DBLAKE2_REF_DIR=... overrides.
+# The repository's canonical portable BLAKE2b (bytes in
+# BLAKE/vendor/blake2; provenance pin in BLAKE/uniblake/PROVENANCE.md);
+# -DBLAKE2_REF_DIR=... overrides.
 if(NOT DEFINED BLAKE2_REF_DIR)
   set(BLAKE2_REF_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../BLAKE/vendor/blake2")
 endif()
 if(NOT EXISTS "${BLAKE2_REF_DIR}/blake2b-ref.c")
   message(FATAL_ERROR "Vendored blake2b-ref.c not found at ${BLAKE2_REF_DIR} -- "
-    "see BLAKE/vendor/blake2/PROVENANCE.md, or set -DBLAKE2_REF_DIR=... explicitly.")
+    "see BLAKE/uniblake/PROVENANCE.md, or set -DBLAKE2_REF_DIR=... explicitly.")
 endif()
 
 add_library(rk_pow STATIC pow.cc "${BLAKE2_REF_DIR}/blake2b-ref.c")

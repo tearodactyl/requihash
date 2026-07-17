@@ -4,7 +4,7 @@
 //! Tang-Sun-Gong, eprint 2025/1351 Sec 5.2. See `../Equihash.md` F-A4.
 //!
 //! Wire-compatible with the C++ build in `../cpp`: identical BLAKE2b
-//! personalization (`"ReqhashPoW" || le32(n) || le16(k)`), identical leaf keying
+//! personalization (`"ReqPoW" || reserved[4] || le32(n) || le16(k)`), identical leaf keying
 //! (`H(input || nonce || le32(leaf mod k) || le32(leaf / k))`), and identical
 //! minimal (compressed) solution encoding.
 
@@ -75,8 +75,10 @@ impl Params {
         (1usize << self.k) * self.collision_bit_length() / 8
     }
     fn person(&self) -> [u8; 16] {
+        // SPEC.md §3: "ReqPoW"(6) ‖ reserved[6..10)=0 ‖ le32(n) ‖ le16(k).
         let mut p = [0u8; 16];
-        p[..10].copy_from_slice(b"ReqhashPoW");
+        p[..6].copy_from_slice(b"ReqPoW");
+        // p[6..10) left zero (reserved)
         p[10..14].copy_from_slice(&self.n.to_le_bytes());
         p[14] = (self.k & 0xFF) as u8;
         p[15] = ((self.k >> 8) & 0xFF) as u8;
@@ -744,10 +746,16 @@ mod tests {
     #[test]
     fn regularity_rejects_swapped_leaves() {
         // A valid solution with two leaves swapped must fail (ordering/collision).
+        // Search a few nonces for one that yields a solution — which nonce
+        // does is persona-dependent (SPEC.md §3), so don't pin nonce 0.
         let p = Params::new(48, 5).unwrap();
-        let eng = Requihash::new(p, b"requihash-test-block-header", &0u32.to_le_bytes());
-        let sols = eng.solve();
-        let s = sols.first().expect("need a solution");
+        let s = (0u32..64)
+            .find_map(|nonce| {
+                let eng = Requihash::new(p, b"requihash-test-block-header",
+                                         &nonce.to_le_bytes());
+                eng.solve().first().map(|s| (eng, s.clone()))
+            });
+        let (eng, s) = s.expect("a solution within the first 64 nonces");
         let mut t = s.clone();
         t.swap(0, 1);
         assert!(eng.is_valid_solution(&t).is_err());

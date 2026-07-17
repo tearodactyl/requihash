@@ -96,7 +96,7 @@ impl GenProbe {
         #[cfg(feature = "blake3")]
         let (base3, iter3) = {
             let context = format!(
-                "ReqPoW/blake3 v1 ctx=ReqhashPoW n={} k={} m={} keying={}",
+                "ReqPoW/blake3 v1 ctx=ReqPoW n={} k={} m={} keying={}",
                 p.n,
                 p.k,
                 m,
@@ -378,8 +378,10 @@ impl GenProbe {
 }
 
 fn person(p: Params) -> [u8; 16] {
+    // SPEC.md §3: "ReqPoW"(6) ‖ reserved[6..10)=0 ‖ le32(n) ‖ le16(k).
     let mut out = [0u8; 16];
-    out[..10].copy_from_slice(b"ReqhashPoW");
+    out[..6].copy_from_slice(b"ReqPoW");
+    // out[6..10) left zero (reserved)
     out[10..14].copy_from_slice(&p.n.to_le_bytes());
     out[14] = (p.k & 0xFF) as u8;
     out[15] = ((p.k >> 8) & 0xFF) as u8;

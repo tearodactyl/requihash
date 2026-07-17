@@ -166,6 +166,16 @@ Requihash use actually exercises.
      and `outlen ≤ 64` — so a debug build (`-DNDEBUG` absent) traps a
      broken invariant instead of overflowing `buf`, while release pays
      nothing (verified: both debug and Release/NDEBUG builds pass 6/6).
+     *Fixed-size question, checked against the reference*: the three
+     runtime-sized copies (`memcpy(buf+buflen, in, inlen)`,
+     `memset(buf+buflen, 0, 128-buflen)`, `memcpy(out, buffer, outlen)`)
+     are **byte-for-byte the vendored reference's own** (blake2b-ref.c
+     lines 242/261/267). They cannot be made fixed-size — `inlen`,
+     `buflen`, `outlen` are inherently runtime values, and forcing a
+     constant 128-/64-byte copy would over-copy garbage. So we do not
+     "harden" past what the canonical reference does; the fixed-size
+     copies we *can* have (the 16-byte persona, the struct/snapshot
+     copies) already use constant lengths.
    - *Error-handling model, two tiers*: **external-input checks return
      error codes and stay in release** — `init`/`final` bounds
      violations return -1, `import` returns specific `UB_IMPORT_*`
@@ -188,12 +198,15 @@ Requihash use actually exercises.
    *dirty mid-operation* state (different persona, wrong outlen, a
    500-byte half-absorbed message polluting t/buf/buflen) yields
    byte-identical output to a fresh import; (b) importing into a
-   0x00-filled vs. a **0xEE-filled** target produces byte-identical
-   structs. *Why 0xEE*: a non-zero, non-0xFF, non-plausible-field bit
-   pattern (0b11101110) that maximally differs from the 0x00 target, so
-   if import left any byte unwritten it would show up as 0xEE residue in
-   the diff. `ub_state` has no hidden fields beyond the six serialized,
-   so "reset all including internal" is total.
+   0x00-filled vs. a **0x55-filled** target produces byte-identical
+   structs. *Why 0x55* (0b01010101): a value that differs from the 0x00
+   target in every bit, so any byte import left unwritten would surface
+   as 0x55 residue in the diff. (It is also the bitwise complement of
+   the 0xAA the output-bounds test uses, keeping the two "sentinel"
+   values a recognizable pair; neither is sourced from a reference —
+   they are just conspicuous non-zero patterns.) `ub_state` has no
+   hidden fields beyond the six serialized, so "reset all including
+   internal" is total.
 
 ## Reproduce
 

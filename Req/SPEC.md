@@ -73,7 +73,12 @@ consumes this spec and adds nothing to it.
   classic single-list Equihash keying.
 - `context`: the domain-separation stem. This tree uses the 6-byte ASCII stem
   `"ReqPoW"`, followed by 4 reserved (zero) bytes held for future use, then the
-  parameter binding. (Zcash's deployed Equihash uses a different personalization
+  parameter binding. The 6-byte stem (vs. a longer name that would fill the
+  personal field solid) means the reserved bytes at `person[6..10)` also give
+  the stem room for a terminating `\0` when it is handled as a C string literal
+  — `"ReqPoW\0"` fits within the personal block with bytes to spare, whereas a
+  10-byte stem would leave no space for a terminator before `le32(n)`.
+  (Zcash's deployed Equihash uses a different personalization
   layout — 8-byte stem, le32(n), le32(k) — and is *not* bit-compatible with this
   family; compatibility mode is out of scope for v1.)
 

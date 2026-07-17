@@ -105,15 +105,24 @@ govern:
    Correctness never rests on code origin.
 2. **Documented provenance, pinned per release**: every UniBlake
    release carries a provenance manifest naming the exact upstream
-   version/commit of every outside input in whichever mode it was
-   used — **plugged in** (vendored-unmodified, commit pinned),
-   **rewritten from** (derived; source commit + complete deviation
-   list, `rk/original`-style), or **used as a direct example**
-   (original code authored here, informed-by citation recorded,
-   oracle-tested). Pinning is not a property of the vendored mode
-   only — all three modes pin what they took and from where, so any
-   release's audit path is reconstructible without this repository's
-   history.
+   version/commit of every outside input in whichever of the **four
+   modes** it was used:
+   - **vendored** (plugged in unmodified, commit pinned) — the bytes are
+     the upstream's, byte-for-byte;
+   - **adjusted** (vendored, changed only to compile / fix naming or
+     edge parameter-passing — build/platform-class edits per §1d that do
+     not touch the algorithm's steps; commit pinned + the edit list) —
+     e.g. an arg-order glue shim, a portability fork like
+     `rk/original`;
+   - **rewritten from** (derived; source commit + a complete deviation
+     list) — the algorithm re-expressed, oracle-proven equivalent;
+   - **authored** (original code written here; any informed-by citation
+     recorded, oracle-tested) — no upstream bytes, used-as-a-direct-
+     example at most.
+   Pinning is not a property of the vendored mode only — all four modes
+   pin what they took and from where (authored pins its informing
+   citation, if any), so any release's audit path is reconstructible
+   without this repository's history.
 
 ## 1b. On "no acceleration by library swapping" — a preference, not a strict rule
 
@@ -345,12 +354,10 @@ are catalogued for R6 but not adopted this pass.
 
 ### x86 / NEON optimization breadth and quality, per implementation
 
-*What the ISA abbreviations mean, when each shipped, and what to expect
-on real hardware is the job of [`Platforms.md`](Platforms.md) — this
-table is a per-donor **capability survey** for UniBlake's sourcing
-decision, not an ISA primer. The quality tell for BLAKE2b (byte-permute
-rotations vs. shift-OR; lane count) and the "2-lane vs. strong scalar"
-effect are defined there.*
+*ISA meanings, timelines, the rotation/lane quality tells, and the
+NEON-vs-scalar performance picture all live in
+[`Platforms.md`](Platforms.md) — this table is a per-donor **capability
+survey** for UniBlake's sourcing decision, not an ISA primer.*
 
 Assessment method, stated: (1) ISA inventory from source; (2) technique
 inspection (rotation method + lane count, per `Platforms.md`); (3)
@@ -361,7 +368,7 @@ history.
 
 | Implementation | x86 breadth/quality | NEON breadth/quality |
 |---|---|---|
-| package `sse/` | SSE2 baseline; SSSE3 adds `pshufb` rotations; SSE4.1 load scheduling; AVX = 128-bit encodings only. Single-message, 2-lane. **No AVX2 → obsolete-good** | `neon/`: single-message, ARMv7+AArch64, `tbl`/`ext` rotations (correct technique); slower-than-scalar reports on some AArch64 cores — the 2-lane + strong-scalar problem, needs our measurement (U2) |
+| package `sse/` | SSE2 baseline; SSSE3 adds `pshufb` rotations; SSE4.1 load scheduling; AVX = 128-bit encodings only. Single-message. **No AVX2 → obsolete-good** | `neon/`: single-message, ARMv7+AArch64, `tbl`/`ext` rotations (correct technique); perf caveat in `Platforms.md` §5 |
 | libb2 | same lineage as package `sse/`, minus AVX2 (commented), plus racy install | none |
 | libsodium | **best maintained x86 single-message set**: SSSE3/SSE4.1/AVX2 compress with proper byte-permute rotations, sound runtime picker, active fix history | none |
 | blake2b-rs | package `sse/` verbatim (2020 copy) — inherits its ceiling | none |
@@ -564,10 +571,9 @@ not a blank page:
 
 - **Batch ("many") API.** Interleave N independent messages through
   one compress call to fill SIMD lanes. Donor shapes: `blake2b_simd`'s
-  `many::hash_many` (4-way AVX2, measured *counterproductive on ARM* —
-  `vendor/blake2-rs/README.md`), Neves' `blake2-avx2`. Value is
-  x86-only for BLAKE2b (2-lane NEON doesn't win); BLAKE3's tree
-  structure batches inherently. **Open question**: is the Equihash
+  `many::hash_many` (4-way AVX2), Neves' `blake2-avx2`. Batch value is
+  x86-only for BLAKE2b; BLAKE3's tree structure batches inherently.
+  **Open question**: is the Equihash
   leaf-generation shape (many tiny messages sharing a 140-byte prefix)
   better served by a batch API or by the existing midstate + snapshot
   (§4) path? Unmeasured on x86.
@@ -583,7 +589,126 @@ not a blank page:
 No decision is taken here. These materials exist so U4's discussion is
 short.
 
-## 7. Rust side (after the C core stands)
+## 7. The stable public API — surface, return values, error handling
+
+This is the central, authoritative description of the `ub_` public API
+(header: `uniblake/include/uniblake.h`). In-code comments annotate each
+function; this section is the contract. Verbiage follows RFC 7693's
+reference C and the vendored BLAKE2 reference (`return 0` on success,
+`return -1` on illegal parameters) so the convention is recognizable to
+anyone who knows BLAKE2.
+
+**Return-value convention (matches BLAKE2 reference + RFC 7693).**
+Integer-returning functions return **`0` on success and `-1` on error**
+— identical to `blake2b_init`/`update`/`final` in both the vendored
+reference and RFC 7693 §appendix (which comments `-1 // illegal
+parameters`). `size_t`-returning functions (`ub_state_size`,
+`ub_state_align`, `ub_snapshot_size`) report a size and cannot fail.
+The one exception is snapshot import, which returns a **typed enum**
+(`ub_import_rc`) rather than a bare `-1`, because import must
+distinguish "not our data" from "our data, wrong version" from
+"corrupt" — a distinction the reference has no analog for (it has no
+serialized-state import). This is an *extension* of the BLAKE2
+convention, not a departure from it.
+
+**Error-handling model, two tiers** (see also `uniblake/STATUS.md`):
+- *Caller-facing contract checks return error codes and are kept in
+  release builds.* A caller passing `outlen = 0` or `> 64`, a NULL
+  output, a too-small output buffer, or a corrupt snapshot gets a clean
+  error return — never undefined behavior. These mirror the reference's
+  own `if (!outlen || outlen > BLAKE2B_OUTBYTES) return -1` guards.
+- *Internal invariants use `assert()` (compiled out under `-DNDEBUG`).*
+  Conditions that can only be violated by a library bug — not by caller
+  misuse — are development guardrails, not release control flow. The
+  rule: never `assert` on data a caller controls; never return an error
+  code for a condition only a bug can cause.
+
+### 7a. Function reference
+
+| Function | Returns | Success | Error / notes |
+|---|---|---|---|
+| `ub_state_size()` | `size_t` | bytes to allocate for a `ub_state` | cannot fail; runtime-reported, never assume `sizeof` |
+| `ub_state_align()` | `size_t` | required alignment | cannot fail |
+| `ub_blake2b_init(S, outlen)` | `int` | `0` | `-1` if `outlen == 0` or `> 64` |
+| `ub_blake2b_init_personal(S, outlen, personal)` | `int` | `0` | `-1` as above; `personal` may be NULL (= all-zero) |
+| `ub_blake2b_update(S, in, inlen)` | `int` | `0` | `0` also for `inlen == 0` (no-op); absorbs `in` |
+| `ub_blake2b_final(S, out, outlen)` | `int` | `0` | `-1` if `out == NULL`, `outlen < S->outlen`, or already finalized |
+| `ub_blake2b_copy(dst, src)` | `int` | `0` | `-1` if either is NULL; copies the *live* struct (midstate clone) |
+| `ub_blake2b(out, outlen, in, inlen, personal)` | `int` | `0` | `-1` if any sub-call fails; one-shot convenience |
+| `ub_snapshot_size()` | `size_t` | bytes for a snapshot (v1: 232) | cannot fail |
+| `ub_blake2b_export(S, out, outcap)` | `int` | `0` | `-1` if `out == NULL` or `outcap < ub_snapshot_size()` |
+| `ub_blake2b_import(S, in, inlen)` | `ub_import_rc` | `UB_IMPORT_OK` (0) | typed codes below |
+| `ub_active_kernel()` | `ub_kernel_id` | the selected kernel | never `UB_KERNEL_AUTO` after init |
+| `ub_force_kernel(id)` | `int` | `0` | `-1` if `id` not registered/available OR it fails the oracle gate (§5) |
+| `ub_selftest()` | `int` | `0` (all kernels pass) | `-(id)` of the first failing kernel |
+| `ub_kernel_name(id)` | `const char*` | kernel name | `"(unknown)"` for an unregistered id |
+
+**`ub_import_rc` codes** (import distinguishes failure classes so a
+caller never silently misreads):
+
+| Code | Meaning |
+|---|---|
+| `UB_IMPORT_OK` (0) | reconstructed a live state |
+| `UB_IMPORT_EBADARG` | NULL argument |
+| `UB_IMPORT_ETRUNCATED` | input shorter than the declared format |
+| `UB_IMPORT_EMAGIC` | not a uniblake snapshot |
+| `UB_IMPORT_EFAMILY` | wrong hash family (e.g. a BLAKE3 snapshot) |
+| `UB_IMPORT_EVERSION` | uniblake snapshot, unsupported format version |
+| `UB_IMPORT_ECORRUPT` | header valid but a body field is out of range |
+
+### 7b. The snapshot format and its `UBS_` names
+
+The versioned state snapshot (§4) is defined in `uniblake/src/
+ub_snapshot.c`. Its constants use the **`UBS_` prefix = "UniBlake
+Snapshot"**, and `UBS_V1_` marks the **version-1 wire format**
+specifically (so a future v2 layout adds `UBS_V2_*` without disturbing
+v1 readers). The magic bytes spell `"UBS1"` (`UBS_MAGIC0..3`), the
+`UBS_VERSION` byte is 1, `UBS_V1_SIZE` is 232. The format is
+fixed-width and endianness-pinned by design (not a struct dump) so a
+snapshot is portable across ABIs — see §4 and the `size_t`/padding note
+in `ub_snapshot.c`.
+
+### 7c. Storage is the caller's — but it is NOT performance-neutral
+
+Two statements that are both true and must not be conflated (in-code
+comments state the first; this section is where the second — the one
+that governs how we quote numbers — is recorded, because a struct
+comment is not the place to set benchmarking policy):
+
+1. *For correctness*, the library is **agnostic** to where a `ub_state`
+   lives (stack / heap / static). The API only takes `ub_state *`,
+   never copies by value, holds no pointers across calls, and does no
+   internal allocation. So "is `buf` stack or heap?" is not a
+   correctness question (§7 / the public header's storage note).
+2. *For performance*, storage is **not** neutral, and any benchmark or
+   user-facing throughput claim must say which it measured. The leaf
+   loop clones the midstate **once per leaf** — 2^21 times at (200,9) —
+   via `ub_blake2b_copy` (a `memcpy` of the whole `ub_state`, ~240 B).
+   Whether those clones land in a tight stack frame the compiler keeps
+   hot, or in heap allocations with churn, changes the measured
+   ns/leaf. This is exactly why `ub_state` stays lean (STATUS finding 6:
+   drop `last_node`, keep transient SIMD scratch out of the struct) —
+   the leanness is a *performance* decision justified by the per-leaf
+   copy, even though the *correctness* contract wouldn't care.
+
+**Rule for quoting numbers**: `ub_kbench` copies the midstate on the
+stack per leaf (the miner's hot pattern) and reports the CPU (§6); a
+figure is only comparable to another that used the same storage and
+copy pattern. A benchmark that heap-allocated per leaf, or that hashed
+one long message instead of many short leaves, is measuring a different
+thing and must be labeled as such. (This is the storage-specific case
+of §6's broader "a number needs its exact conditions" rule.)
+
+**General principle this instances**: an in-code comment documents
+*what a line does*; it does not discharge the need to record an
+*architectural decision and its implied assumptions* somewhere central
+and findable. Decisions like "opaque state / oracle-by-#include", "lean
+struct for the per-leaf copy", the two-tier error model (§7), and the
+snapshot's ABI-independence (§4) live in this document and
+`uniblake/STATUS.md` precisely so they are not buried as line comments a
+reader would have to reverse-engineer.
+
+## 8. Rust side (after the C core stands)
 
 - `blake2ref` evolves into the wrapper over UniBlake — same opaque
   runtime-sized-state design (§3 defense 1), now with dispatch
@@ -606,7 +731,7 @@ short.
   identical solver conditions (native Rust vs. C-dispatch backends in
   the same run).
 
-## 8. Consumers, eventually
+## 9. Consumers, eventually
 
 `rk/original`, `cs`, `rz` cross-check binaries, RT reference builds
 (all currently on the raw vendored files — they switch to UniBlake's

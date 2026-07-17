@@ -265,7 +265,7 @@ reason.
 
 ### Expert NEON reference implementations to study (verify correct ISA use)
 
-*Local mirror pinned at Linux v6.12:
+*Local mirror pinned at Linux v6.8 (Ubuntu 24.04 LTS default kernel):
 `~/Work/ZK/ZKs/BLAKE/kernel-neon-refs/` (blake2b-neon + chacha-neon core
 `.S` + glue `.c`, with a provenance README). GPL — study reference only,
 never built or vendored into uniblake.*
@@ -330,12 +330,42 @@ shape, or the number is a fiction.**
 The exact sizes (from `Req/SPEC.md` §3–5; header sizes from Zero400's
 `CBlockHeader`, `src/primitives/block.h`):
 
+The **140-byte prefix** absorbed into `S0` is the serialized Zcash block
+header — an **essential, ecosystem-wide format** the entire Zcash/Zcash-
+derived world (zcashd, zebra, Zero400, every miner) implements
+identically. It is not something uniblake or Requihash defines (the hash
+just absorbs the bytes), but it must be documented because a solver has
+to produce exactly these bytes. From Zero400's `CBlockHeader`
+(`src/primitives/block.h`, `HEADER_SIZE`):
+
+```
+serialized block header  (little-endian fields, 140 bytes total)
+ offset  size  field                  meaning
+ ┌──────┬─────┬──────────────────────┬───────────────────────────────┐
+ │   0  │  4  │ nVersion             │ block version (int32; Zcash=4) │
+ │   4  │ 32  │ hashPrevBlock        │ prev block hash (uint256)      │
+ │  36  │ 32  │ hashMerkleRoot       │ tx merkle root (uint256)       │
+ │  68  │ 32  │ hashFinalSaplingRoot │ Sapling commitment root        │
+ │ 100  │  4  │ nTime                │ block timestamp, Unix seconds  │
+ │ 104  │  4  │ nBits                │ compact difficulty target      │
+ ├──────┼─────┼──────────────────────┼───────────────────────────────┤
+ │ 108  │ 32  │ nNonce               │ the PoW nonce (uint256)        │
+ └──────┴─────┴──────────────────────┴───────────────────────────────┘
+   bytes [0,108) = `input`  ‖  bytes [108,140) = `nonce`
+   S0.update(input); S0.update(nonce)   (SPEC §3)
+```
+
+`nTime` is **`uint32_t`** (unsigned) — it does eventually roll over, at
+~year **2106** (not 2038; that's the *signed* int32 problem). This is
+Zcash's long-standing choice, shared by Bitcoin's header; a new chain in
+this family wanting a wider timestamp would change its own header format
+(a chain/Zebro decision), not the hash.
+
+Then the rest of the hashing inputs:
+
 | Quantity | Value | Source |
 |---|---|---|
-| Persona (BLAKE2b `personal`) | 16 B = `"ReqhashPoW"`(10) ‖ `le32(n)`(4) ‖ `le16(k)`(2) | SPEC §3 — **encodes n,k**, not just ASCII |
-| Header `input` | 108 B = version(4)+prevBlock(32)+merkleRoot(32)+saplingRoot(32)+time(4)+bits(4) | Zero400 `HEADER_SIZE` minus nonce |
-| Nonce | 32 B (`uint256 nNonce`) | Zero400 |
-| Prefix into S0 | **140 B** = input(108) ‖ nonce(32); `S0.update(input); S0.update(nonce)` | SPEC §3 |
+| Persona (BLAKE2b `personal`) | 16 B = `"ReqPoW"`(6) ‖ reserved(4, zero) ‖ `le32(n)`(4) ‖ `le16(k)`(2) | SPEC §3 — **encodes n,k**; ranges half-open |
 | Iteration dial `m` (if ≥2) | `le16(m)` (2 B) absorbed after nonce | SPEC §3/§5 |
 | Per-leaf tail | `le32(counter)` = **4 B** (`regular` keying adds `le32(class)`, 8 B total) | SPEC §4 |
 | Digest length `hash_output` | `⌊512/n⌋·(n/8)` bytes | SPEC §5 |
@@ -351,15 +381,23 @@ neighborhood"), and the leaf-string length taken from each:
 | (192,7) | 48 | 24 |
 | (200,9) | 50 | 25 |
 
-**Two truncations, at two layers** (why our stress test brackets ~50 B):
-*64→`hash_output`* happens **in the hash primitive** — BLAKE2b always
-computes 64 bytes internally and `final` copies only `outlen`
-(=`hash_output`) out (`ub_final_with`'s `memcpy(out, buffer,
-S->outlen)`; the Rust twin is `blake2b.rs:140`). *`hash_output`→`n/8`*
-(e.g. 50→25) happens **in the solver**, taking the first `n` bits as the
-consensus leaf string (`Req/rust/src/probe.rs`'s `d.truncate(n/8)`). The
-hash primitive owns the first truncation via `outlen`; the leaf string
-is the caller's slice of the digest.
+**Two truncations, at two layers** (why our stress test brackets ~50 B).
+Reading the `64→50→25` chain at (200,9): **64** = BLAKE2b's fixed
+internal digest width; **50** = `hash_output` = `⌊512/n⌋·(n/8)`, the
+per-hash output length; **25** = `n/8` = the **leaf string**, the first
+`n = 200` bits of the digest, which is the actual consensus object each
+solution index points at (the remaining `50 − 25 = 25` bytes of the
+digest are spec-flagged design freedom, §SPEC 3, not consensus).
+- *64→`hash_output`* happens **in the hash primitive** — BLAKE2b always
+  computes 64 bytes internally and `final` copies only `outlen`
+  (=`hash_output`) out (`ub_final_with`'s `memcpy(out, buffer,
+  S->outlen)`; the Rust twin is `blake2b.rs:140`).
+- *`hash_output`→`n/8`* (50→25) happens **in the solver**, taking the
+  first `n` bits as the consensus leaf string
+  (`Req/rust/src/probe.rs`'s `d.truncate(n/8)`).
+
+The hash primitive owns the first truncation via `outlen`; the leaf
+string is the caller's slice of the digest.
 
 **`m ≥ 2` (the iteration dial), briefly.** `m=1` is one hash per leaf
 (the common case; midstate optimization applies). For `m ≥ 2`, S0 also

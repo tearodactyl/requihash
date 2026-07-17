@@ -118,7 +118,7 @@ repository's vendored copy `BLAKE/vendor/blake2/blake2b-ref.c` (Samuel
 Neves, CC0, no x86-specific intrinsics — builds unmodified on arm64
 and x86_64 alike), referenced repo-relative by `CMakeLists.txt`;
 override with `cmake -DBLAKE2_REF_DIR=...`. Provenance:
-`BLAKE/vendor/blake2/PROVENANCE.md`.
+`BLAKE/uniblake/PROVENANCE.md`.
 
 One CMake-specific pitfall hit and fixed during this port: `project(...)`
 must declare **both** `CXX` and `C` (`project(cs_klist CXX C)`) —

@@ -234,8 +234,8 @@ file.
 **What it is**: 16 bytes of the parameter block XOR-folded into the
 initial state — a domain separator, cryptographically equivalent to a
 different hash function per value. Equihash sets
-`"ZcashPoW" ‖ le32(n) ‖ le32(k)` (Requihash: `"ReqhashPoW" ‖ le32(n) ‖
-le16(k)`, `Req/SPEC.md` §3): solutions for one chain/parameter set are
+`"ZcashPoW" ‖ le32(n) ‖ le32(k)` (Requihash: `"ReqPoW" ‖ reserved[4] ‖
+le32(n) ‖ le16(k)`, `Req/SPEC.md` §3): solutions for one chain/parameter set are
 meaningless for any other *by construction*, before any protocol rule.
 
 **Connection to block information and the verification path**: the
@@ -364,7 +364,7 @@ Rust-backed).
 |---|---|---|---|
 | x86 SIMD, one message (`sse/` lineage) | vectorize the G-function's 4×64-bit lanes within one hash | ~1.5–2x over scalar | diminishing: one message has limited internal parallelism |
 | x86 SIMD, **interleaved batch** (AVX2: `blake2bip`, `blake2b_simd::many`) | run 4–8 *independent* hashes across SIMD lanes | ~4x+ over scalar per core | needs the caller to batch (Equihash leaf loop batches naturally) |
-| NEON (aarch64) | same idea, 128-bit registers | marginal for BLAKE2**b**: 64-bit words leave only 2 lanes, and NEON lacks a 64-bit rotate (emulated in 2–3 ops) — the package's own `neon/` code has *reports of running slower than scalar* on some cores | this is a BLAKE2b-specific weakness; BLAKE3 (32-bit words, 4 lanes) vectorizes well on NEON |
+| NEON (aarch64) | same idea, 128-bit registers | marginal-to-negative for BLAKE2b (measured; details in `Platforms.md` §5) | a BLAKE2b-specific weakness; BLAKE3 vectorizes well on NEON |
 | GPU / CUDA (SILENTARMY, nheqminer kernels, tromp's `eqcuda`) | thousands of leaf hashes + the whole Wagner sort/merge on-device | orders of magnitude on *throughput* | only pays at miner scale; PCIe latency and kernel-launch overhead swamp single-solve use; the real win historically was GPU-resident *sorting*, not just hashing |
 | Multicore | parallelize across nonces (embarrassingly parallel) or across buckets within a solve (tromp's `pthread_barrier` rounds; Req Q1's rayon plan) | near-linear across nonces | orthogonal to and composable with all of the above |
 
@@ -388,15 +388,9 @@ and Crypto++'s BLAKE2 NEON path (Walton/Neves); BLAKE3's NEON kernel
 ships in its official implementations (a different hash, listed for
 contrast); libsodium and OpenSSL carry none.
 
-The **why-AArch64-headroom-is-modest** analysis (2-lane NEON vs. strong
-AArch64 scalar; rotation-technique and diagonalization detail; the
-32-bit-ARMv7-origin of these ports) now lives in
-[`Platforms.md`](Platforms.md) §5, not restated here. **This question is
-no longer purely theoretical**: uniblake's U2 NEON kernel *measured* it
-on Apple M4 — NEON is 0.55–0.70× scalar (slower), exactly the predicted
-2-lane-vs-strong-scalar loss (`uniblake/STATUS.md`, `UniBlake.md` §2b).
-The remaining measurement questions (weaker aarch64 cores, interleaved
-batch) stay optimization-stage work.
+The NEON-vs-scalar performance picture (why AArch64 headroom is modest,
+and the measured result) is out of scope for this doc — it lives in
+[`Platforms.md`](Platforms.md) §5.
 
 ### 5.3 Why tromp changed the struct and API, and the standard way now
 

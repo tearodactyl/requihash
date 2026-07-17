@@ -43,7 +43,7 @@ pub fn agrees_with_reference(reference: &dyn LeafHasher, cand: &dyn LeafHasher) 
         return false;
     }
     let n = reference.output_len();
-    let person = *b"ReqhashPoW\x60\x00\x00\x00\x05\x00"; // arbitrary fixed 16 bytes
+    let person = *b"ReqPoW\x00\x00\x00\x00\x60\x00\x00\x00\x05\x00"; // arbitrary fixed 16 bytes ("ReqPoW"+reserved)
     let prefix = b"self-test-prefix";
     let keys: Vec<(u32, u32)> = (0..64u32).map(|i| (i % 5, i / 5)).collect();
     let mut a = vec![0u8; keys.len() * n];

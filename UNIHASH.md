@@ -161,10 +161,11 @@ alone would suggest.
 
 **`Req/`'s own construction** (`Req/cpp/requihash.h`'s `InitialiseState`,
 lines 174-182; `Req/SPEC.md` §3, normative): a 16-byte BLAKE2b
-personalization field, `person[0..10] = "ReqhashPoW"` (this project's own
-10-byte ASCII domain-separation stem, distinct from Zcash's `"ZcashPoW"`-
-based layout — `Req/SPEC.md` §2's `context` note), `person[10..14] =
-le32(n)`, `person[14..16] = le16(k)` — so the personalization field itself
+personalization field (byte ranges half-open, `[start, end)`):
+`person[0..6) = "ReqPoW"` (this project's own 6-byte ASCII domain-
+separation stem, distinct from Zcash's `"ZcashPoW"`-based layout —
+`Req/SPEC.md` §2's `context` note), `person[6..10)` reserved (zero),
+`person[10..14) = le32(n)`, `person[14..16) = le16(k)` — so the personalization field itself
 already binds the scheme name *and* the exact `(n,k)` parameter pair before
 a single byte of block content is absorbed. The base state is then built as
 `S0 = blake2b_init(digest_len, person)`, `S0.update(input)`,
