@@ -23,6 +23,8 @@ pub trait Solver {
 
 /// All registered solver backends, for benchmarking and equivalence testing.
 pub fn all_solvers() -> Vec<Box<dyn Solver>> {
+    // `mut` is used only when the `rayon` feature pushes the parallel solver.
+    #[cfg_attr(not(feature = "rayon"), allow(unused_mut))]
     let mut v: Vec<Box<dyn Solver>> = vec![
         Box::new(reference::ReferenceSolver),
         Box::new(arena::ArenaSolver),

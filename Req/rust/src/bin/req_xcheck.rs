@@ -5,6 +5,14 @@
 //!
 //! Minimal hand-rolled JSON field extraction (no external deps) — the vector
 //! files have a fixed, known shape emitted by cpp/req_gen.cpp.
+//!
+//! Scope: this is a **Requihash** cross-check (regular keying, "ReqPoW"
+//! persona). It skips vectors whose `keying` is `single` — those are the
+//! official Zcash Equihash KATs (`zcash_kat_*.json`), a different
+//! construction verified against the pinned `equihash` crate in the library
+//! test `zcash_kat_vectors_verify_against_pinned_equihash_crate` (the crate
+//! is a dev-dependency, not reachable from this bin). Files may hold a single
+//! vector object or a JSON list of them; both are handled.
 
 use requihash::*;
 use std::fs;
@@ -45,8 +53,23 @@ fn parse_indices(s: &str) -> Vec<u32> {
         .collect()
 }
 
-fn check_vector(path: &Path) -> bool {
+/// Returns Some(true/false) = checked (pass/fail); None = skipped (not a
+/// Requihash vector, e.g. a Zcash single-keying KAT).
+fn check_vector(path: &Path) -> Option<bool> {
     let s = fs::read_to_string(path).unwrap();
+
+    // Route by keying. Requihash vectors are `regular` (or omit the field);
+    // `single` marks the Zcash KATs, which this Requihash tool does not
+    // verify (see the module doc comment).
+    if s.contains("\"keying\"") && field(&s, "keying").trim_start().starts_with("\"single\"") {
+        println!(
+            "skip {}: Zcash single-keying KAT — verified against the equihash crate \
+             in the library test, not here",
+            path.display()
+        );
+        return None;
+    }
+
     let n = parse_u32(&s, "n");
     let k = parse_u32(&s, "k");
     let input = parse_hex(&s, "input_hex");
@@ -61,14 +84,14 @@ fn check_vector(path: &Path) -> bool {
     let decoded = get_indices_from_minimal(&minimal, cbl);
     if decoded != indices {
         println!("FAIL {}: minimal decode != indices", path.display());
-        return false;
+        return Some(false);
     }
 
     // 2. Re-encode matches the C++ minimal bytes (byte-exact wire format).
     let reencoded = get_minimal_from_indices(&indices, cbl);
     if reencoded != minimal {
         println!("FAIL {}: re-encode != C++ minimal", path.display());
-        return false;
+        return Some(false);
     }
 
     // 3. The Rust verifier accepts the C++-mined solution.
@@ -77,7 +100,7 @@ fn check_vector(path: &Path) -> bool {
         Ok(()) => {}
         Err(e) => {
             println!("FAIL {}: Rust verifier rejected C++ solution: {e}", path.display());
-            return false;
+            return Some(false);
         }
     }
 
@@ -94,7 +117,7 @@ fn check_vector(path: &Path) -> bool {
         indices.len(),
         minimal.len()
     );
-    true
+    Some(true)
 }
 
 fn main() {
@@ -102,7 +125,8 @@ fn main() {
         .nth(1)
         .unwrap_or_else(|| "../vectors".to_string());
     let mut all_ok = true;
-    let mut count = 0;
+    let mut checked = 0;
+    let mut skipped = 0;
     let mut entries: Vec<_> = fs::read_dir(&dir)
         .unwrap_or_else(|_| panic!("cannot read vectors dir {dir}"))
         .filter_map(|e| e.ok())
@@ -111,17 +135,21 @@ fn main() {
         .collect();
     entries.sort();
     for p in entries {
-        count += 1;
-        if !check_vector(&p) {
-            all_ok = false;
+        match check_vector(&p) {
+            Some(true) => checked += 1,
+            Some(false) => {
+                checked += 1;
+                all_ok = false;
+            }
+            None => skipped += 1,
         }
     }
-    if count == 0 {
+    if checked == 0 && skipped == 0 {
         println!("no vectors found in {dir} — run cpp/build/req_gen first");
         std::process::exit(1);
     }
     if all_ok {
-        println!("\nCROSS-CHECK PASS ({count} vectors)");
+        println!("\nCROSS-CHECK PASS ({checked} Requihash vectors, {skipped} Zcash KATs skipped)");
     } else {
         println!("\nCROSS-CHECK FAILED");
         std::process::exit(1);

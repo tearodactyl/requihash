@@ -879,4 +879,90 @@ mod tests {
             }
         }
     }
+
+    // ---- A14: official Zcash Equihash KAT vectors verify against the
+    // pinned equihash crate (the correct oracle for single-list keying) ----
+    //
+    // The vectors/zcash_kat_*.json files are the equihash crate's own
+    // test_vectors::valid (keying = "single", "ZcashPoW" persona) — a
+    // DIFFERENT construction from Requihash's regular keying. They must be
+    // verified with the Zcash verifier, not the Requihash engine (which is
+    // why req_xcheck, a Requihash-only tool, correctly skips them). Each
+    // file is a JSON list of vectors; every one must validate.
+    #[test]
+    fn zcash_kat_vectors_verify_against_pinned_equihash_crate() {
+        use std::fs;
+
+        // Extract every value for `key` across a JSON list, in order.
+        fn all_str_fields(s: &str, key: &str) -> Vec<String> {
+            let pat = format!("\"{key}\"");
+            let mut out = Vec::new();
+            let mut rest = s;
+            while let Some(i) = rest.find(&pat) {
+                let after = &rest[i + pat.len()..];
+                let colon = after.find(':').unwrap();
+                let v = after[colon + 1..].trim_start();
+                let start = v.find('"').unwrap() + 1;
+                let end = v[start..].find('"').unwrap() + start;
+                out.push(v[start..end].to_string());
+                rest = &after[colon + 1 + end..];
+            }
+            out
+        }
+        fn all_u32_fields(s: &str, key: &str) -> Vec<u32> {
+            let pat = format!("\"{key}\"");
+            let mut out = Vec::new();
+            let mut rest = s;
+            while let Some(i) = rest.find(&pat) {
+                let after = &rest[i + pat.len()..];
+                let colon = after.find(':').unwrap();
+                let v = after[colon + 1..].trim_start();
+                let end = v.find(|c: char| !c.is_ascii_digit()).unwrap_or(v.len());
+                out.push(v[..end].parse().unwrap());
+                rest = &after[colon + 1 + end..];
+            }
+            out
+        }
+        fn hex(h: &str) -> Vec<u8> {
+            (0..h.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+                .collect()
+        }
+
+        let mut total = 0usize;
+        for name in ["zcash_kat_96_5", "zcash_kat_144_5", "zcash_kat_200_9"] {
+            // Located relative to Req/rust (CARGO_MANIFEST_DIR).
+            let path = format!("{}/../vectors/{name}.json", env!("CARGO_MANIFEST_DIR"));
+            let s = fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
+
+            let ns = all_u32_fields(&s, "n");
+            let ks = all_u32_fields(&s, "k");
+            let inputs = all_str_fields(&s, "input_hex");
+            let nonces = all_str_fields(&s, "nonce_hex");
+            let minimals = all_str_fields(&s, "minimal_hex");
+            let keyings = all_str_fields(&s, "keying");
+            let count = minimals.len();
+            assert!(count > 0, "{name}: no vectors parsed");
+            assert_eq!(ns.len(), count, "{name}: field-count mismatch");
+
+            for i in 0..count {
+                assert_eq!(keyings[i], "single", "{name}[{i}]: expected single keying");
+                // The crate takes the minimal (compressed) solution bytes
+                // directly and does its own decode + full verification.
+                let res = equihash::is_valid_solution(
+                    ns[i], ks[i], &hex(&inputs[i]), &hex(&nonces[i]), &hex(&minimals[i]),
+                );
+                assert!(
+                    res.is_ok(),
+                    "{name}[{i}] (n={},k={}) rejected by pinned equihash crate: {:?}",
+                    ns[i], ks[i], res
+                );
+                total += 1;
+            }
+        }
+        assert!(total >= 3, "expected multiple KAT vectors, got {total}");
+        eprintln!("verified {total} official Zcash Equihash KAT vectors against the pinned crate");
+    }
 }

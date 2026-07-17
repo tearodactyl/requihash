@@ -10,7 +10,9 @@
 //! Marginal deltas attribute in-context cost; the residual is the interaction
 //! term and is reported, never forced to zero.
 
-use crate::{blake2b, expand_array, expand_array_into, Params};
+use crate::{blake2b, expand_array_into, Params};
+#[cfg(all(test, feature = "blake3"))]
+use crate::expand_array; // used only in the blake3-gated tests below
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HashKind {
@@ -59,6 +61,9 @@ pub struct GenProbe {
     base2b: blake2b::State,
     /// input || nonce || (le16(m) when m >= 2): the absorbed prefix, kept for
     /// backends whose batched APIs take whole messages instead of midstates.
+    /// Read only under the `simd` feature (batched hash_many path); still
+    /// built unconditionally, so silence the default-build dead-code lint.
+    #[cfg_attr(not(feature = "simd"), allow(dead_code))]
     prefix: Vec<u8>,
     #[cfg(feature = "simd")]
     simd_params: Option<blake2b_simd::Params>,

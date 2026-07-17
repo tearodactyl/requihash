@@ -58,6 +58,8 @@ pub fn agrees_with_reference(reference: &dyn LeafHasher, cand: &dyn LeafHasher) 
 /// silently fork consensus, so this gate is non-optional).
 pub fn autodetect(_p: Params) -> Box<dyn LeafHasher> {
     let reference = scalar::Blake2bScalar::new();
+    // `mut` is used only when the `simd` feature adds a candidate below.
+    #[cfg_attr(not(feature = "simd"), allow(unused_mut))]
     let mut candidates: Vec<Box<dyn LeafHasher>> = Vec::new();
     #[cfg(feature = "simd")]
     candidates.push(Box::new(simd::Blake2bSimd::new()));
