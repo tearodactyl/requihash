@@ -27,7 +27,7 @@ first, every time.
   C/C++ consumer builds against (repo-relative, no absolute paths),
   `BLAKE/RFC/` the RFC 7693 copy with extracted, validated sample code.
   `BLAKE/UniBlake.md` is the unified-BLAKE2/3 design; `BLAKE/uniblake/`
-  its built PoC (see that dir's `STATUS.md`/`PACKAGING.md`);
+  its built PoC (see that dir's `STATUS.md`/`DEPLOY.md`);
   `BLAKE/Platforms.md` the x86-SIMD/NEON instruction-family + hardware
   reference behind the SIMD targeting decisions.
 
@@ -108,7 +108,7 @@ lookup file could without drifting out of sync:
 Hash-primitive clones (blake2b/blake3, behind `Req/`'s Seam A — see
 `Req/ARCHITECTURE.md` §1a): `blake2-reference` (`BLAKE2/BLAKE2`, the
 official C reference, `neon/` NEON backend analyzed in `BENCHMARK.md` §7a/
-PLAN.md A13), `blake2_simd` (`oconnor663/blake2_simd`, the Rust crate this
+PLAN.md T1 / T4.4), `blake2_simd` (`oconnor663/blake2_simd`, the Rust crate this
 project and Zebra both depend on), `BLAKE3` and `BLAKE3-specs`
 (`BLAKE3-team/BLAKE3` and its spec repo). Full citations, provenance, and the
 vendored canonical copy: `BLAKE/BLAKE.md` (this directory).
@@ -118,7 +118,7 @@ Reach into these clones for: real `(n,k)`/personalization cross-checks
 Rust verifier (`zebra`/`ycash-zebra` vs. Req's own `rust/src/lib.rs` and
 `zcash/src/rust/src/equihash.rs`); comparing Req's C++ against zcashd's actual
 in-tree fork (`zcash/src/crypto/equihash.{h,cpp,tcc}`, forked at `690fc5eff`,
-never resynced — `SOLVERS.md`). `Req/PLAN.md` A6 (Req's own future
+never resynced — `SOLVERS.md`). `Req/PLAN.md` T2.4 (Req's own future
 production index-pointer solver) has no existing clone to copy from —
 genuinely unbuilt work, distinct from RK/RZ/RT's standalone historical
 ports above, which do have real upstream sources.
@@ -132,7 +132,7 @@ Entry point: `~/Work/ZK/Zebro/ZEBRO.md` §1 (restart procedure).
 - Zebro's M3 evidence package needs `zebro-bench` curves across PoW
   parameter sets — Req's own counting-allocator memory harness
   (`rust/src/bin/req_memcheck.rs`) is built and measured, but only up to
-  (96,5) (`Req/SIZING.md` §2a); extending past that is `Req/PLAN.md` Q2,
+  (96,5) (`Req/SIZING.md` §2a); extending past that is `Req/PLAN.md` T2.2,
   a prerequisite for M3, not just adjacent.
 - Zebro `ARCHITECTURE.md` uses the same swap-seam pattern as
   `Req/ARCHITECTURE.md` for hash/solve/verify backends.

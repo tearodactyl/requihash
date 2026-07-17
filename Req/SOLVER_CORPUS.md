@@ -587,6 +587,15 @@ is RZ's target, ported separately.
 
 ## CS
 
+**Status (2026-07-17): C++ port done; Rust re-port `cs-rs/` also done.**
+`SOLVER_CORPUS/cs/` is the canonical C++ port; `SOLVER_CORPUS/cs-rs/` is
+a faithful Rust re-port (mirrors RZ's crate layout, plain unkeyed
+BLAKE2b via `blake2b_simd`, both conventions + the `big_shr` direction
+reproduced), validated byte-exact against the same 4 vectors — the C++
+port is its differential oracle. Gap: `cs-rs` has correctness tests but
+no `reqbench` bench binary yet (the RZ-style A21 gap). The task spec
+below is retained as the original C++ port's brief.
+
 ### Task
 
 Write a canonical C++ implementation matching the paper's own Python

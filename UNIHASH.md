@@ -1,5 +1,9 @@
 # UNIHASH.md — a unifying parametrization across Equihash, Requihash, and Sequihash
 
+*These three are the **GBP-based PoW** family (a.k.a. k-XOR PoW / the
+Equihash family); the class name and its neighbors are in `Equihash.md`
+Appendix A.*
+
 **Status: proposal, not adopted anywhere.** Nothing here is implemented;
 `Req/SPEC.md` remains the normative spec for what this project's own
 engine actually does (`keying ∈ {regular, single}`, both already real

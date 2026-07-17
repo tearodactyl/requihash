@@ -1,0 +1,23 @@
+[package]
+name = "cs-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the 2025/1351 paper's own Python \"Sequihash\" k-list Wagner solver (a faithful re-port of the C++ reference in SOLVER_CORPUS/cs)"
+publish = false
+
+[lib]
+name = "cs_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cs_gen"
+path = "src/bin/cs_gen.rs"
+
+[dependencies]
+# Plain unkeyed BLAKE2b (no personalization) — matches the C++ port's
+# blake2b(digest, n/8, msg, len, NULL, 0). Pure-Rust, portable path used.
+blake2b_simd = { version = "1", default-features = false }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

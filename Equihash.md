@@ -283,3 +283,36 @@ Tang, Sun, Gong (2025). `SOLVERS.md` — Biryukov & Khovratovich (2016),
 xenoncat's own algorithm description PDF (a primary source, not a paper in
 `PAPERS.md` — see `SOLVERS.md` §0.2), Alcock & Ren (2017), Bai et al.
 (2019).
+
+## Appendix A — Taxonomy: GBP-PoW and its neighbors
+
+**Class name.** Equihash, Sequihash, and Requihash are one family:
+**GBP-based PoW** (formal; a.k.a. k-XOR PoW), colloquially the *Equihash
+family* / *"-quihash" constructions*. Substrate: the Generalized
+Birthday Problem solved by Wagner's k-list algorithm, memory-hard,
+asymmetric (cheap verify / expensive solve). `UNIHASH.md` is the
+cross-scheme unification; all three share the regularity-binding tree
+over a GBP list and differ only in keying/serialization.
+
+**Not the same class (sibling asymmetric PoWs, cited as comparanda, not
+members):** Cuckoo Cycle/Cuckatoo (**Tromp**; MimbleWimble/Grin/Beam) —
+*graph-cycle* capacity-hardness, a different mechanism; RandomX (Monero)
+— general-CPU-execution-hardness; Ethash/ProgPoW (pre-Merge Ethereum) —
+DAG memory-*bandwidth*; Autolykos (Ergo) — bandwidth-hard k-sum, a GBP
+cousin. The umbrella over *all* of these is "asymmetric PoW," the one
+property they share.
+
+**Lineage split (the key nuance):** John **Tromp** authored the
+reference Equihash *solvers* (GBP family) **and** designed Cuckoo Cycle
+(the MimbleWimble PoW) — same practitioner, two distinct classes.
+**Khovratovich** (with Biryukov) originated Equihash itself. So:
+
+| Lineage | Class | Members |
+|---|---|---|
+| Khovratovich | **GBP-PoW** | Equihash, Sequihash, Requihash |
+| Tromp | Cuckoo-family | Cuckoo Cycle/Cuckatoo (Grin/Beam) |
+| — | other asymmetric | RandomX (exec), Ethash/ProgPoW (bandwidth), Autolykos (bandwidth) |
+
+*Caveat (F-A8): the field has largely left pure DRAM-capacity-hardness,
+so "capacity-hard" is not the live umbrella; RandomX (execution-general)
+is the surviving ASIC-resistance benchmark.*

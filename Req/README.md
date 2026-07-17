@@ -7,8 +7,8 @@ Problem" [PAPERS.md has summary and references]
 Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
 (what's implemented vs. specified-only); [ARCHITECTURE.md](ARCHITECTURE.md) —
 code/backend structure, plus which 2016-17 optimization technique each solver
-backend implements and measures; [PLAN.md](PLAN.md) — Groups A–C status and
-requirements, the cross-track sequencing view; [BENCHMARK.md](BENCHMARK.md)
+backend implements and measures; [PLAN.md](PLAN.md) — the live work tracker
+(active work by topic T1–T7, with dependencies and execution order); [BENCHMARK.md](BENCHMARK.md)
 — throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
 solution size and memory across parameters, naive vs. index-pointer;
 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — structural attack-surface
@@ -16,7 +16,7 @@ review, including the time-memory-tradeoff (TMTO) test plan (§8-8a);
 [SOLVER_CORPUS.md](SOLVER_CORPUS.md) — standalone historical solver/verifier
 ports (RK/Khovratovich solver, RZ/tromp's pinned single-core-stripped
 solver, RT/tromp's full multi-core solver, CS/Sequihash) for expertise and
-cross-implementation measurement, separate from the pending Group A-C work;
+cross-implementation measurement, separate from the pending T1–T7 work;
 [../UNIHASH.md](../UNIHASH.md) — a proposed unifying parametrization across
 Equihash/Requihash/Sequihash (research, not adopted, kept separate from this
 spec so it doesn't pollute pending-implementation context);
@@ -62,8 +62,8 @@ cross-validated here (§"What Requihash changes" below); (3) the current,
 ongoing work — implementation quality, concurrency, and memory-sizing fitness
 across parameters, which superseded further hash-vs-hash comparison as the
 priority once the ARM blake2b/blake3 campaign answered that question
-([PLAN.md](PLAN.md) "Current direction"). The single biggest open item across all
-of Req/ is compact index-pointer storage (`Req/PLAN.md` A6) — it unblocks
+([PLAN.md](PLAN.md) §1 topic T2). The single biggest open item across all
+of Req/ is compact index-pointer storage (`Req/PLAN.md` T2.4 / legacy A6) — it unblocks
 (200,9)-scale mining, gives an honest memory floor, and is the prerequisite
 for the TMTO experiments in `SECURITY_ANALYSIS.md` §8. [PLAN.md](PLAN.md) is
 the authoritative, continuously-updated status tracker; nothing below should
@@ -93,6 +93,15 @@ has one clear owner (cross-references below say who).
   [ARCHITECTURE.md](ARCHITECTURE.md) — the seam/trait structure, directory
   layout, and (§7) exactly which 2016-17 optimization technique each backend
   implements, with measured before/after numbers for each.
+- **The BLAKE / hash-primitive track (UniBlake).** A separate, independent
+  track from the solver work. [../BLAKE/UniBlake.md](../BLAKE/UniBlake.md) is
+  the design (unified C/C++ BLAKE2b: dispatch, forced-impl, oracle gate,
+  snapshot, stable-API reference §7); [../BLAKE/uniblake/STATUS.md](../BLAKE/uniblake/STATUS.md)
+  is the PoC state (green on arm64 M4, U0–U3 + NEON done, U4–U6 open);
+  [../BLAKE/Platforms.md](../BLAKE/Platforms.md) is the x86-SIMD/NEON hardware
+  reference. [../BLAKE/BLAKE.md](../BLAKE/BLAKE.md) is the vendoring decision
+  record; [../BLAKE/uniblake/PROVENANCE.md](../BLAKE/uniblake/PROVENANCE.md)
+  the single provenance manifest for all vendored BLAKE2 bytes.
 - **Doing security/adversarial review, or picking up a TMTO/hypothesis
   experiment.** [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) end to end — the
   shortcut hunt, the lessons (L1-L8) and hypotheses (H1-H5), and the
@@ -148,9 +157,11 @@ sweeps everything. This is deliberate, not an oversight: `SOLVER_CORPUS.md`'s
 own cross-cutting requirement is that each port needs "no other context
 needed from this repository's other documents," and a shared workspace
 would quietly couple every port's dependency resolution and lockfile to
-every other's. Concretely, five independent Rust packages exist today,
-each with its own `Cargo.toml`/`Cargo.lock`/`target/` (CS is a separate,
-CMake-built C++ crate, not Cargo — see `SOLVER_CORPUS/cs/README.md`):
+every other's. Concretely, **six** independent Rust packages exist today,
+each with its own `Cargo.toml`/`Cargo.lock`/`target/`. (CS has a
+CMake-built C++ port at `SOLVER_CORPUS/cs/` **and** a Cargo Rust re-port
+at `SOLVER_CORPUS/cs-rs/`, added 2026-07-17 — the C++ is the Rust's
+differential oracle.)
 
 | Crate | Path | Depends on (path deps) |
 |---|---|---|
@@ -158,6 +169,7 @@ CMake-built C++ crate, not Cargo — see `SOLVER_CORPUS/cs/README.md`):
 | `reqbench` | `SOLVER_CORPUS/reqbench/` | none — dependency-free by design (`BENCH.md`) |
 | `rz` | `SOLVER_CORPUS/rz/` | `reqbench` (relative path `../reqbench`) |
 | `rk` | `SOLVER_CORPUS/rk/` | `reqbench` (relative path `../reqbench`) |
+| `cs-rs` | `SOLVER_CORPUS/cs-rs/` | none — `blake2b_simd` only (no `reqbench` bench binary yet — a tracked gap) |
 | *(future)* `rt` | `SOLVER_CORPUS/rt/` | will depend on `reqbench` the same way `rz`/`rk` do, per `SOLVER_CORPUS/_template/` |
 
 **Expected usage: `cd` into the crate you want, then plain `cargo`
