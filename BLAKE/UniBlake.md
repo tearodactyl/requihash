@@ -1,9 +1,26 @@
 # UniBlake — unified C/C++ BLAKE2 (and BLAKE3) setup
 
-**Status: PROPOSAL, decision pending.** Design for discussion; nothing
-below is built. On approval this becomes `BLAKE/uniblake/`, a PLAN
-item, and the supersession target for `BLAKE.md` §5.4's dispatch
-sketch and icebox A13.
+**Status: DESIGN + PoC.** The design below is settled enough that a
+proof-of-concept was built and is **green on arm64 macOS (M4)** — it
+proves the load-bearing shape (persona-carrying reference, runtime
+probe + registration + dispatch + `UB_FORCE_IMPL`, the oracle
+self-test gate with a demonstrated negative case, all three §1d
+validation oracle types). The PoC lives at `uniblake/` — see
+`uniblake/STATUS.md` for what it proves and `uniblake/PLAN.md` for the
+selections made to build it. This document remains the authoritative
+*design*; the PoC realizes checkpoints C0–C3 of it. Still open /
+unbuilt: SIMD kernels (U2), state snapshot (U3), batch (U4), Rust
+wrapper (U5), BLAKE3 (U6), and x86/Windows *runs* (structured, not yet
+run — `uniblake/BUILD.md`). This is the supersession target for
+`BLAKE.md` §5.4's dispatch sketch and icebox A13.
+
+**PoC findings that feed back into this design** (detail:
+`uniblake/STATUS.md`): (1) the §2 exclusive-dispatch-table optimization
+concern is confirmed present and is the first thing U1-proper must
+measure; (2) compiling the vendored reference under a renamed symbol
+prefix gives a zero-edit in-tree oracle — the pattern generalizes; (3)
+the self-test battery is currently duplicated between core and gate
+test and should be unified before U1 hardens.
 
 **Document intent — written for later repartitioning.** This file is a
 single home for the design *now*, but each numbered section is written

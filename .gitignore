@@ -1,6 +1,8 @@
 Cargo.lock
-Req/rust/target/
-Req/cpp/build/
-Req/SOLVER_CORPUS/*/target/
+BLAKE/*/build
+BLAKE/*/target
+Req/*/build/
+Req/*/target/
 Req/SOLVER_CORPUS/*/build/
+Req/SOLVER_CORPUS/*/target/
 prompt.txt
