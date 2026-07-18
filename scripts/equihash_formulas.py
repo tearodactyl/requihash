@@ -65,6 +65,31 @@ def naive_peak_bytes_this_repo_model(n: int, k: int) -> float:
     return n_list * (n / 8 + 4)
 
 
+def full_index_model_bytes(n: int, k: int) -> float:
+    """N * (3*cbyte + 12*2^(k-1) + 96) bytes: the full-index peak model
+    (SIZING.md section 1c) for this repo's reference/arena/bucket backends.
+
+    Derivation: the peak is the coexistence (round double-buffering) of the
+    last two row generations. A round-r row carries (k+1-r)*cbyte remaining
+    hash bytes and 4*2^r index bytes, so generations k-1 and k contribute
+    (2+1)*cbyte hash bytes and 4*(2^(k-1) + 2^k) = 12*2^(k-1) index bytes
+    per row, plus ~96 B of container headers across both generations.
+
+    Validated against req_memcheck's counting-allocator measurements at the
+    valid measured points -- measured/predicted: (48,5) 1.20x, (72,5) 0.87x,
+    (96,5) 1.51x; RK's independently measured 10.5 GB at (120,4) is 1.67x
+    (different codebase) -- versus the naive payload floor's 20-35x
+    understatement. Residual spread: allocator
+    size-class rounding, Vec growth-doubling slack, survivor-count variance,
+    and backend layout differences. Applies to FULL-INDEX representations
+    only; an index-pointer backend (PLAN T2.4) deliberately breaks this
+    model's dominant 2^(k-1) term.
+    """
+    n_list = init_list_size(n, k)
+    cbyte = (collision_bit_length(n, k) + 7) // 8
+    return n_list * (3 * cbyte + 12 * 2 ** (k - 1) + 96)
+
+
 def equihash_memory_bits_prop4(n: int, k: int) -> float:
     """O(n*N) bits at constant 1 -- reproduces the paper's own published
     Table 3 Equihash memory column to within +/-0.04 in log2 bits across
@@ -141,10 +166,17 @@ def validate_against_paper_table3(verbose: bool = True) -> bool:
 
 # The extrapolated sweep used in SIZING.md section 2 -- kept here so it can
 # be regenerated identically rather than hand-copied into a table again.
+# Mirrors SIZING.md §4's tier tables exactly (2026-07-17 restructure): only
+# implementable params (ell in [8,25], n <= 512 — REVIEW_REQ.md F12-F14).
+# Former TB-scale rows ((168,5)+, (232,7)+, (280,9)+) and sub-8-ell rows
+# ((24,5), (32,7), (40,9)) removed — not constructible. Keep in sync with
+# SIZING.md §4 in the same pass (A20 discipline).
 SWEEP_POINTS = {
-    5: [24, 48, 72, 96, 120, 144, 168, 192, 216],
-    7: [32, 96, 128, 168, 192, 232, 264, 296],
-    9: [40, 120, 160, 200, 240, 280, 320],
+    4: [40, 80, 120],
+    5: [48, 72, 96, 120, 144],
+    7: [96, 128, 168, 192, 200],
+    8: [216],
+    9: [80, 120, 160, 200, 240],
 }
 
 
@@ -170,7 +202,9 @@ def sweep_rows():
                 "verify_hashes_m1": verify_hash_count(k, 1),
                 "verify_hashes_m1_source": "computed",
                 "naive_peak_bytes_this_repo_model": naive_peak_bytes_this_repo_model(n, k),
-                "naive_peak_bytes_this_repo_model_source": "computed (known low by 20-52x vs measured, see SIZING.md 2a)",
+                "naive_peak_bytes_this_repo_model_source": "computed (payload floor; see SIZING.md 1c)",
+                "full_index_model_bytes": full_index_model_bytes(n, k),
+                "full_index_model_bytes_source": "modeled (calibrated 0.7-1.4x vs measured, SIZING.md 1c/3)",
                 "equihash_memory_bytes_extrapolated": equihash_memory_bits_prop4(n, k) / 8,
                 "equihash_memory_bytes_extrapolated_source": "interpolated (Prop 4, validated vs paper Table 3)",
                 "requihash_memory_bytes_extrapolated": requihash_memory_bits_prop6(n, k) / 8,
@@ -182,7 +216,8 @@ def print_sweep():
     header = (
         f"{'k':>2} {'n':>4} {'ell':>4} {'N':>10} "
         f"{'sol(min/compact)':>18} {'verify':>7} "
-        f"{'naive(model)':>14} {'equihash(interp)':>17} {'requihash(interp)':>18}"
+        f"{'naive(floor)':>14} {'full-index(model)':>18} "
+        f"{'equihash(interp)':>17} {'requihash(interp)':>18}"
     )
     print(header)
     for row in sweep_rows():
@@ -192,6 +227,7 @@ def print_sweep():
             f"{row['k']:>2} {row['n']:>4} {row['ell']:>4.0f} {n_col:>10} "
             f"{sol_col:>18} {row['verify_hashes_m1']:>7} "
             f"{human_bytes(row['naive_peak_bytes_this_repo_model']):>14} "
+            f"{human_bytes(row['full_index_model_bytes']):>18} "
             f"{human_bytes(row['equihash_memory_bytes_extrapolated']):>17} "
             f"{human_bytes(row['requihash_memory_bytes_extrapolated']):>18}"
         )

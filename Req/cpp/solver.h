@@ -140,6 +140,16 @@ inline bool IsValidSolution(const Requihash& eh, const reqb2::State& base,
         if (uniq.size() != indices.size()) return false;
     }
 
+    // range check (T2.3 F11, mirrors the Rust verifiers): every index must
+    // name a leaf, i.e. be < 2^(ell+1). The wire path cannot express larger
+    // values (minimal encoding is ell+1 bits per index); this guards the
+    // raw-vector API path.
+    {
+        uint64_t maxLeaf = uint64_t(1) << (P.CollisionBitLength() + 1);
+        for (eh_index i : indices)
+            if (uint64_t(i) >= maxLeaf) return false;
+    }
+
     // rebuild leaf rows in given order
     std::vector<WRow> X(indices.size());
     std::vector<unsigned char> hashOut(P.HashOutput());
@@ -283,6 +293,12 @@ inline bool IsValidSolutionEarly(const Requihash& eh, const reqb2::State& base,
         std::set<eh_index> uniq(indices.begin(), indices.end());
         if (uniq.size() != indices.size()) return false;
     }
+    // range check (T2.3 F11) — see IsValidSolution
+    {
+        uint64_t maxLeaf = uint64_t(1) << (P.CollisionBitLength() + 1);
+        for (eh_index i : indices)
+            if (uint64_t(i) >= maxLeaf) return false;
+    }
     std::vector<std::vector<unsigned char>> level(indices.size());
     {
         std::vector<unsigned char> hashOut(P.HashOutput()), expanded(full);
@@ -312,7 +328,12 @@ inline bool IsValidSolutionEarly(const Requihash& eh, const reqb2::State& base,
         span *= 2;
     }
     if (level.size() != 1) return false;
-    for (size_t t = 0; t < P.k * cByte; t++)
+    // Root check must cover the FULL row (T2.3 F10, mirrored from the Rust
+    // fix): the first k*cByte bytes are zero by construction for any input
+    // that passed the k collision rounds — the real XOR-to-zero condition is
+    // the final segment [k*cByte, full), which the previous `t < P.k * cByte`
+    // bound never inspected, silently accepting k-collision near-misses.
+    for (size_t t = 0; t < full; t++)
         if (level[0][t]) return false;
     return true;
 }

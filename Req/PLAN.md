@@ -68,9 +68,9 @@ specs for T2.1–T2.3 are in §3.*
 | # | Item | Status | Depends on | Notes |
 |---|---|---|---|---|
 | T2.1 | Concurrency audit of the merge/sort phase (bucket-parallel merge) | Ready | — | `parallel.rs` parallelizes only leaf-gen today; full spec §3 |
-| T2.2 | Memory-fitness pass: real vs. modeled peak across the sweep | Ready | reads `SIZING.md` | full spec §3; also finishes the "extend past (96,5)" memory measurement |
-| T2.3 | Impl-quality review of `solve/` + `verify/` | Ready | — | dead code, clones, error-handling, seam consistency; full spec §3 |
-| T2.4 | Production index-pointer backend | Active (prototype done) | — | `solve/pointer.rs` proven at (48,5)/(72,5); needs counting-sort, KAT-validation, memory-measure to enter `all_solvers()` |
+| T2.2 | Memory-fitness pass: real vs. modeled peak across the sweep | Ready — **run gated on explicit owner approval** | reads `SIZING.md` | full spec §3. Calibration protocol agreed 2026-07-17: small points first ((40,4),(80,4),(48,5),(72,5),(96,5)) to calibrate formulas before anything predicted >4 GB or >30 min. F14 caps the sweep: k=5 ends at (144,5), k=7 at (200,7); SIZING §2a's (24,5) anchor is invalid (degenerate cbl 4) — re-anchor the small end |
+| T2.3 | Impl-quality review of `solve/` + `verify/` | Active (fixes landed) | — | findings F1–F14 + resolutions + corner-case inventory in `REVIEW_REQ.md`: F10 vacuous-root-check bug (fixed ×3, falsified regression test), F11 index-range gap (fixed ×5), F12/F13/F14 parameter-bound gaps (n<=512, k>=1, cbl ∈ [8,25]; fixed both languages), F1 binding consolidated (`leaf_row_into`) + README amended, full rejection-path matrix Rust+C++. Remaining: M4 re-bench (`rust/bench.sh`), SPEC clarification (F11–F14), encoding-seam audit, rejection vectors |
+| T2.4 | Production index-pointer backend | Active (prototype done) | — | `solve/pointer.rs` proven at (48,5)/(72,5); needs counting-sort, KAT-validation, memory-measure to enter `all_solvers()`. **On completion: revisit F8** (`REVIEW_REQ.md`) — pointer `Solver`-trait/registration decision |
 
 **Order:** T2.1/T2.3 can start immediately and in parallel; T2.2 and T2.4
 inform each other (the memory-fitness target is stable once the pointer
@@ -247,6 +247,22 @@ count.
 **Guidelines**: don't mutate `bucket.rs`'s existing single-threaded
 solver (add a new backend); follow its counting-sort exactly; match
 `parallel.rs`'s doc-comment style.
+
+**Design (2026-07-17, reviewed, not yet implemented):** counting sort
+stays sequential; the bucket walk parallelizes by *chunks of bucket
+ranges* (per-bucket tasks are too fine — at (96,5), ~2^17 rows over
+65,536 buckets is ~2 rows/bucket; chunk ≈ `nbuckets / (threads × 16)`).
+Each rayon task reads `hashes`/`idxs`/`order` immutably and writes
+task-local `(out_hashes, out_idxs)`; task outputs are concatenated
+sequentially in chunk order, which reproduces `bucket.rs`'s exact row
+order — byte-identical round state, so `all_solvers_agree` is the
+equivalence gate. Serial residue — the *Amdahl term*: with parallel
+fraction f of the work on p cores, speedup = 1/((1−f) + f/p), capped at
+1/(1−f) no matter how many cores; here the serial (1−f) is the counting
+sort + ordered concatenation + per-round join, so if that residue is
+~20% of the merge the ceiling is 5× — hence expect ~3–5× at 8–10 cores,
+not linear. Optionally reuse `parallel.rs`'s leaf fill for a
+fully-parallel backend.
 
 **Exit**: registered in `all_solvers()`, passes `all_solvers_agree` at
 (48,5)/(72,5)/30 nonces, measured speedup in `BENCHMARK.md` with method +

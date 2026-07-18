@@ -31,6 +31,11 @@ pub enum Error {
     BadParams(&'static str),
     WrongLength,
     NotDistinct,
+    /// An index is >= 2^(ell+1), outside the leaf range (T2.3 F11). The wire
+    /// path cannot express such values (minimal encoding is ell+1 bits per
+    /// index), but the API path takes raw u32 slices, so the verifiers
+    /// enforce the range explicitly as defense in depth.
+    IndexOutOfRange,
     CollisionFailed(u32),
     OrderingFailed(u32),
     NonZeroRoot,
@@ -54,8 +59,63 @@ impl Params {
         if n % (k + 1) != 0 {
             return Err(Error::BadParams("n must be divisible by k+1"));
         }
+        // T2.3 F13: the regularity binding keys a leaf by (leaf % k, leaf / k);
+        // k == 0 is division by zero, not a degenerate-but-defined instance.
+        // k == 1 IS well-defined (single-round collision, leaf % 1 == 0).
+        if k == 0 {
+            return Err(Error::BadParams("k must be >= 1 (regularity binding is leaf mod k)"));
+        }
+        // T2.3 F12: n > 512 makes hash_output() < n/8 (integer 512/n == 0),
+        // and leaf_row's `out[..n/8]` slice would panic — e.g. (520,4) passes
+        // the three checks above. One BLAKE2b digest must cover >= one row.
+        if n > 512 {
+            return Err(Error::BadParams("n must be <= 512 (one BLAKE2b digest per row)"));
+        }
+        // T2.3 F14: expand/compress_array use a u32 accumulator, so the
+        // collision bit length must be in [8, 25] — the same bounds zcash's
+        // ExpandArray asserts. Below 8 the expansion silently under-fills
+        // rows (e.g. (24,5), cbl=4: half of every row stays zero); above 25
+        // the accumulator shifts exceed 32 bits. This is the binding
+        // parameter bound — tighter than any flat cap on n (for k=9 it
+        // caps n at 250, for k=5 at 150).
+        let cbl = n / (k + 1);
+        if cbl < 8 {
+            return Err(Error::BadParams("collision bit length n/(k+1) must be >= 8"));
+        }
+        if cbl > 25 {
+            return Err(Error::BadParams("collision bit length n/(k+1) must be <= 25"));
+        }
         Ok(Params { n, k })
     }
+    /// Smallest and largest valid `n` for a given `k`, derived from the full
+    /// constraint set `new()` enforces: `n % 8 == 0`, `n % (k+1) == 0`
+    /// (together: n is a multiple of `lcm(8, k+1)`), `cbl = n/(k+1)` in
+    /// `[8, 25]` (F14), and `n <= 512` (F12); `k >= 1` (F13) and `n > k` are
+    /// implied. `None` when no valid `n` exists — k == 0, or k > 63 (where
+    /// even cbl = 8 needs n = 8(k+1) > 512). Valid `n` are exactly the
+    /// multiples of `lcm(8, k+1)` in the returned inclusive range.
+    pub fn n_bounds(k: u32) -> Option<(u32, u32)> {
+        if k == 0 {
+            return None;
+        }
+        let m = k + 1;
+        let step = 8 / gcd(8, m) * m; // lcm(8, k+1)
+        let lo = (8 * m).div_ceil(step) * step; // cbl >= 8
+        let hi = (25 * m).min(512) / step * step; // cbl <= 25, n <= 512
+        (lo <= hi).then_some((lo, hi))
+    }
+
+    /// All valid `n` for `k`, ascending (empty when `n_bounds` is `None`).
+    pub fn valid_n(k: u32) -> Vec<u32> {
+        match Self::n_bounds(k) {
+            None => Vec::new(),
+            Some((lo, hi)) => {
+                let step = 8 / gcd(8, k + 1) * (k + 1);
+                (lo..=hi).step_by(step as usize).collect()
+            }
+        }
+    }
+
     pub fn collision_bit_length(&self) -> usize {
         (self.n / (self.k + 1)) as usize
     }
@@ -105,28 +165,34 @@ impl Requihash {
         self.p
     }
 
-    /// Clone of the personalized+prefixed BLAKE2b base state, for solver backends
-    /// that generate leaves directly.
-    pub(crate) fn base_clone(&self) -> blake2b::State {
-        self.base.clone()
+    /// Requihash regularity: leaf keyed by (list-class = leaf mod k,
+    /// counter = leaf / k). THE single site of the regularity binding on the
+    /// Rust side (T2.3 F1): every backend reaches it through here or through
+    /// the zero-alloc `leaf_row_into` below — do not inline the keying
+    /// elsewhere. Returns the expanded collision bytes for the leaf.
+    pub(crate) fn leaf_row(&self, leaf: EhIndex) -> Vec<u8> {
+        let mut digest = vec![0u8; self.p.hash_output()];
+        let mut out = vec![0u8; (self.p.k as usize + 1) * self.p.collision_byte_length()];
+        self.leaf_row_into(leaf, &mut digest, &mut out);
+        out
     }
 
-    /// Requihash regularity: leaf keyed by (list-class = leaf mod k,
-    /// counter = leaf / k). Returns the expanded collision bytes for the leaf.
-    pub(crate) fn leaf_row(&self, leaf: EhIndex) -> Vec<u8> {
+    /// Zero-alloc variant for hot leaf-fill loops: writes the expanded row
+    /// into `out`, using `digest` (length `hash_output()`) as scratch. The
+    /// regularity binding `(leaf mod k, leaf / k)` lives here and only here.
+    pub(crate) fn leaf_row_into(&self, leaf: EhIndex, digest: &mut [u8], out: &mut [u8]) {
         let listclass = leaf % self.p.k;
         let counter = leaf / self.p.k;
         let mut s = self.base.clone();
         blake2b::update(&mut s, &listclass.to_le_bytes());
         blake2b::update(&mut s, &counter.to_le_bytes());
-        let mut out = vec![0u8; self.p.hash_output()];
-        blake2b::finalize(s, &mut out);
-        expand_array(
-            &out[..(self.p.n / 8) as usize],
-            (self.p.k as usize + 1) * self.p.collision_byte_length(),
+        blake2b::finalize(s, digest);
+        expand_array_into(
+            &digest[..(self.p.n / 8) as usize],
+            out,
             self.p.collision_bit_length(),
             0,
-        )
+        );
     }
 
     /// Basic Wagner solve; returns all solutions as `2^k`-length index vectors.
@@ -158,24 +224,20 @@ impl Requihash {
                 }
                 for a in i..j {
                     for b in (a + 1)..j {
-                        if !distinct(&x[a].idx, &x[b].idx) {
+                        if !slices_distinct(&x[a].idx, &x[b].idx) {
                             continue;
                         }
-                        let remain = x[a].h.len();
+                        // XOR only the surviving suffix — the collided leading
+                        // cbyte is dropped here, not XORed-then-drained.
+                        let remain = x[a].h.len() - cbyte;
                         let mut h = vec![0u8; remain];
                         for t in 0..remain {
-                            h[t] = x[a].h[t] ^ x[b].h[t];
+                            h[t] = x[a].h[cbyte + t] ^ x[b].h[cbyte + t];
                         }
-                        h.drain(..cbyte);
-                        let idx = if x[a].idx < x[b].idx {
-                            let mut v = x[a].idx.clone();
-                            v.extend_from_slice(&x[b].idx);
-                            v
-                        } else {
-                            let mut v = x[b].idx.clone();
-                            v.extend_from_slice(&x[a].idx);
-                            v
-                        };
+                        let (lo, hi) = if x[a].idx < x[b].idx { (a, b) } else { (b, a) };
+                        let mut idx = Vec::with_capacity(x[lo].idx.len() * 2);
+                        idx.extend_from_slice(&x[lo].idx);
+                        idx.extend_from_slice(&x[hi].idx);
                         xc.push(Row { h, idx });
                     }
                 }
@@ -205,19 +267,13 @@ impl Requihash {
     /// This removes the per-row heap allocation that the profile showed to be 59%
     /// of solve time (see BENCHMARK.md). Cross-validated against `solve()` in tests.
     pub fn solve_arena(&self) -> Vec<Vec<EhIndex>> {
-        // Serial leaf fill, then the shared arena merge.
+        // Serial leaf fill, then the shared arena merge. Keying goes through
+        // leaf_row_into — the binding's single site (F1) — with one shared
+        // digest scratch across all leaves.
         self.solve_arena_with_leaves(|_nrows, full, hashes| {
-            let mut hout = vec![0u8; self.p.hash_output()];
-            let n8 = (self.p.n / 8) as usize;
-            let cbl = self.p.collision_bit_length();
+            let mut digest = vec![0u8; self.p.hash_output()];
             for (leaf, slot) in hashes.chunks_mut(full).enumerate() {
-                let leaf = leaf as u32;
-                let mut s = self.base.clone();
-                blake2b::update(&mut s, &(leaf % self.p.k).to_le_bytes());
-                blake2b::update(&mut s, &(leaf / self.p.k).to_le_bytes());
-                blake2b::finalize(s, &mut hout);
-                let exp = expand_array(&hout[..n8], full, cbl, 0);
-                slot.copy_from_slice(&exp);
+                self.leaf_row_into(leaf as EhIndex, &mut digest, slot);
             }
         })
     }
@@ -305,10 +361,14 @@ impl Requihash {
             idxs = out_idxs;
             hstride = new_hstride;
             icount = new_icount;
-            nrows = if hstride == 0 { 0 } else { hashes.len() / hstride.max(1) };
-            if new_hstride == 0 {
-                nrows = idxs.len() / new_icount;
-            }
+            // Row count from whichever buffer still has nonzero stride
+            // (T2.3 F4: was a dead `if hstride == 0 { 0 }` branch immediately
+            // overwritten by an identical condition — see Req/REVIEW_REQ.md).
+            nrows = if new_hstride == 0 {
+                idxs.len() / new_icount
+            } else {
+                hashes.len() / new_hstride
+            };
             if nrows == 0 {
                 break;
             }
@@ -390,24 +450,20 @@ impl Requihash {
                 }
                 for a in i..j {
                     for b in (a + 1)..j {
-                        if !distinct(&x[a].idx, &x[b].idx) {
+                        if !slices_distinct(&x[a].idx, &x[b].idx) {
                             continue;
                         }
-                        let remain = x[a].h.len();
+                        // XOR only the surviving suffix — the collided leading
+                        // cbyte is dropped here, not XORed-then-drained.
+                        let remain = x[a].h.len() - cbyte;
                         let mut h = vec![0u8; remain];
                         for t in 0..remain {
-                            h[t] = x[a].h[t] ^ x[b].h[t];
+                            h[t] = x[a].h[cbyte + t] ^ x[b].h[cbyte + t];
                         }
-                        h.drain(..cbyte);
-                        let idx = if x[a].idx < x[b].idx {
-                            let mut v = x[a].idx.clone();
-                            v.extend_from_slice(&x[b].idx);
-                            v
-                        } else {
-                            let mut v = x[b].idx.clone();
-                            v.extend_from_slice(&x[a].idx);
-                            v
-                        };
+                        let (lo, hi) = if x[a].idx < x[b].idx { (a, b) } else { (b, a) };
+                        let mut idx = Vec::with_capacity(x[lo].idx.len() * 2);
+                        idx.extend_from_slice(&x[lo].idx);
+                        idx.extend_from_slice(&x[hi].idx);
                         xc.push(Row { h, idx });
                     }
                 }
@@ -451,6 +507,11 @@ impl Requihash {
                 return Err(Error::NotDistinct);
             }
         }
+        // Range check (F11): every index must name a leaf, i.e. < 2^(ell+1).
+        let max_leaf = 1u64 << (self.p.collision_bit_length() + 1);
+        if indices.iter().any(|&i| (i as u64) >= max_leaf) {
+            return Err(Error::IndexOutOfRange);
+        }
         let cbyte = self.p.collision_byte_length();
 
         struct Row {
@@ -482,16 +543,18 @@ impl Requihash {
                 for t in 0..a.h.len() {
                     h[t] = a.h[t] ^ b.h[t];
                 }
-                let mut idx = a.idx.clone();
+                let mut idx = Vec::with_capacity(a.idx.len() + b.idx.len());
+                idx.extend_from_slice(&a.idx);
                 idx.extend_from_slice(&b.idx);
                 xc.push(Row { h, idx });
                 i += 2;
             }
             x = xc;
         }
-        if x.len() != 1 {
-            return Err(Error::WrongLength);
-        }
+        // Invariant, not an input error: 2^k rows halve exactly k times. A
+        // failure here is an internal bug, so fail loud rather than misreport
+        // it as a (reachable-looking) input rejection (T2.3 F6).
+        assert_eq!(x.len(), 1, "internal: fold must reduce to exactly one row");
         if !x[0].h.iter().all(|&c| c == 0) {
             return Err(Error::NonZeroRoot);
         }
@@ -499,18 +562,19 @@ impl Requihash {
     }
 }
 
-fn distinct(a: &[EhIndex], b: &[EhIndex]) -> bool {
-    for &x in a {
-        for &y in b {
-            if x == y {
-                return false;
-            }
-        }
+fn gcd(a: u32, b: u32) -> u32 {
+    let (mut a, mut b) = (a, b);
+    while b != 0 {
+        (a, b) = (b, a % b);
     }
-    true
+    a
 }
 
-fn slices_distinct(a: &[u32], b: &[u32]) -> bool {
+/// True iff `a` and `b` share no index. The single distinctness helper for all
+/// solver backends (consolidated from two identical private copies, T2.3 F2).
+/// O(|a|·|b|) pairwise scan — fine for the small per-pair vectors in the merge;
+/// the sorted-merge alternative measured no better at these sizes.
+pub(crate) fn slices_distinct(a: &[u32], b: &[u32]) -> bool {
     for &x in a {
         for &y in b {
             if x == y {
@@ -720,6 +784,307 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn all_verifiers_reject_nonzero_root_near_miss() {
+        // Regression test for T2.3 F10: a near-miss passes every per-round
+        // collision and ordering check but its final hash segment is nonzero.
+        // Before the fix, verify-arena and verify-early accepted such inputs:
+        // their root check read the first k*cbyte bytes, which are zero by
+        // construction for ANY input that passes the k collision rounds.
+        use crate::verify::all_verifiers;
+        let p = Params::new(48, 5).unwrap();
+        let cbyte = p.collision_byte_length();
+        let mut tested = 0usize;
+        for ni in 0u32..20 {
+            let eng = Requihash::new(p, b"near-miss", &ni.to_le_bytes());
+            // Wagner merge identical to solve_reference, but harvest the
+            // final-round rows whose remaining hash is NONzero.
+            struct Row {
+                h: Vec<u8>,
+                idx: Vec<EhIndex>,
+            }
+            let init_size = 1usize << (p.collision_bit_length() + 1);
+            let mut x: Vec<Row> = (0..init_size as EhIndex)
+                .map(|leaf| Row {
+                    h: eng.leaf_row(leaf),
+                    idx: vec![leaf],
+                })
+                .collect();
+            for _round in 1..=p.k {
+                x.sort_by(|a, b| a.h[..cbyte].cmp(&b.h[..cbyte]));
+                let mut xc: Vec<Row> = Vec::new();
+                let mut i = 0;
+                while i + 1 < x.len() {
+                    let mut j = i + 1;
+                    while j < x.len() && x[j].h[..cbyte] == x[i].h[..cbyte] {
+                        j += 1;
+                    }
+                    for a in i..j {
+                        for b in (a + 1)..j {
+                            if !slices_distinct(&x[a].idx, &x[b].idx) {
+                                continue;
+                            }
+                            let remain = x[a].h.len() - cbyte;
+                            let mut h = vec![0u8; remain];
+                            for t in 0..remain {
+                                h[t] = x[a].h[cbyte + t] ^ x[b].h[cbyte + t];
+                            }
+                            let (lo, hi) = if x[a].idx < x[b].idx { (a, b) } else { (b, a) };
+                            let mut idx = Vec::with_capacity(x[lo].idx.len() * 2);
+                            idx.extend_from_slice(&x[lo].idx);
+                            idx.extend_from_slice(&x[hi].idx);
+                            xc.push(Row { h, idx });
+                        }
+                    }
+                    i = j;
+                }
+                x = xc;
+            }
+            for r in x {
+                if r.h.iter().all(|&c| c == 0) {
+                    continue; // an actual solution, not a near-miss
+                }
+                let mut u = r.idx.clone();
+                u.sort_unstable();
+                u.dedup();
+                if u.len() != r.idx.len() {
+                    continue; // would (correctly) fail NotDistinct before the root
+                }
+                tested += 1;
+                assert!(
+                    matches!(eng.is_valid_solution(&r.idx), Err(Error::NonZeroRoot)),
+                    "reference must reject a near-miss with NonZeroRoot"
+                );
+                for v in all_verifiers() {
+                    assert!(
+                        v.verify(&eng, &r.idx).is_err(),
+                        "{} accepted a nonzero-root near-miss (F10 regression)",
+                        v.name()
+                    );
+                }
+            }
+        }
+        assert!(tested > 0, "no near-miss rows harvested — test exercised nothing");
+    }
+
+    #[test]
+    fn n_bounds_match_constructor() {
+        // n_bounds/valid_n must agree EXACTLY with what Params::new accepts,
+        // proven exhaustively over k in [0, 70], n in [1, 560] (covers both
+        // boundary regimes: the 25(k+1) cap and the 512 cap, and the
+        // no-valid-n region k > 63).
+        for k in 0..=70u32 {
+            let accepted: Vec<u32> = (1..=560).filter(|&n| Params::new(n, k).is_ok()).collect();
+            assert_eq!(accepted, Params::valid_n(k), "valid_n mismatch at k={k}");
+            match Params::n_bounds(k) {
+                None => assert!(accepted.is_empty(), "k={k}: bounds None but n accepted"),
+                Some((lo, hi)) => {
+                    assert_eq!(accepted.first(), Some(&lo), "k={k} lo");
+                    assert_eq!(accepted.last(), Some(&hi), "k={k} hi");
+                }
+            }
+        }
+        // Spot anchors: production and boundary instances.
+        assert_eq!(Params::n_bounds(9), Some((80, 240))); // (200,9) inside
+        assert_eq!(Params::n_bounds(5), Some((48, 144))); // k=5 sweep ceiling
+        assert_eq!(Params::n_bounds(7), Some((64, 200))); // cbl-25 boundary
+        assert_eq!(Params::n_bounds(63), Some((512, 512))); // last valid k
+        assert_eq!(Params::n_bounds(64), None);
+        assert_eq!(Params::n_bounds(0), None); // F13
+    }
+
+    #[test]
+    fn params_rejected() {
+        // BadParams corner cases:
+        //   F12: n > 512 previously passed the divisibility gates ((520,4))
+        //        and panicked later in leaf_row;
+        //   F13: k == 0 is division by zero in the regularity binding;
+        //   F14: collision bit length must be in [8, 25] (u32 accumulator in
+        //        expand/compress_array; zcash's own ExpandArray bounds) —
+        //        (24,5) has cbl 4 (silent row under-fill), (168,5) has 28.
+        for (n, k) in [
+            (200u32, 200u32), // k >= n
+            (50, 5),          // n % 8 != 0
+            (48, 6),          // n % (k+1) != 0
+            (48, 0),          // F13: k == 0
+            (520, 4),         // F12: n > 512
+            (24, 5),          // F14: cbl 4 < 8
+            (168, 5),         // F14: cbl 28 > 25
+            (512, 3),         // F14: cbl 128 > 25
+            (0, 0),           // k >= n (both zero)
+        ] {
+            assert!(
+                matches!(Params::new(n, k), Err(Error::BadParams(_))),
+                "({n},{k}) must be rejected"
+            );
+        }
+        assert!(Params::new(48, 5).is_ok());
+        assert!(Params::new(48, 1).is_ok(), "k == 1 is well-defined (cbl 24)");
+        assert!(Params::new(200, 9).is_ok());
+        assert!(Params::new(144, 5).is_ok(), "k=5 sweep ceiling (cbl 24)");
+        assert!(Params::new(200, 7).is_ok(), "cbl == 25 upper boundary");
+        assert!(Params::new(512, 31).is_ok(), "n == 512 boundary (cbl 16)");
+    }
+
+    #[test]
+    fn rejection_path_matrix() {
+        // T2.3 corner-case inventory: for every Error variant an input that
+        // fails exactly there, and every verifier must return the SAME
+        // variant (they share the check order: length -> distinct -> range ->
+        // per-round collision-then-ordering -> root). NonZeroRoot is covered
+        // by `all_verifiers_reject_nonzero_root_near_miss`; BadParams by
+        // `params_rejected`-style constructor tests.
+        use crate::verify::all_verifiers;
+
+        fn assert_all(eng: &Requihash, input: &[EhIndex], expect: &Error, case: &str) {
+            let got = eng
+                .is_valid_solution(input)
+                .expect_err(&format!("{case}: reference accepted"));
+            assert_eq!(
+                format!("{got:?}"),
+                format!("{expect:?}"),
+                "{case}: reference variant"
+            );
+            for v in all_verifiers() {
+                let got = v
+                    .verify(eng, input)
+                    .expect_err(&format!("{case}: {} accepted", v.name()));
+                assert_eq!(
+                    format!("{got:?}"),
+                    format!("{expect:?}"),
+                    "{case}: {} variant",
+                    v.name()
+                );
+            }
+        }
+
+        let p = Params::new(48, 5).unwrap();
+        let k = p.k as usize;
+        let cbyte = p.collision_byte_length();
+        let (eng, sol) = (0u32..50)
+            .find_map(|ni| {
+                let eng = Requihash::new(p, b"matrix", &ni.to_le_bytes());
+                eng.solve_reference().into_iter().next().map(|s| (eng, s))
+            })
+            .expect("no solution in 50 nonces");
+
+        // WrongLength: empty, truncated, extended (length gate fires first).
+        assert_all(&eng, &[], &Error::WrongLength, "WrongLength/empty");
+        assert_all(&eng, &sol[..sol.len() - 1], &Error::WrongLength, "WrongLength/short");
+        let mut long = sol.clone();
+        long.push(sol[0]);
+        assert_all(&eng, &long, &Error::WrongLength, "WrongLength/long");
+
+        // NotDistinct: duplicate one index.
+        let mut dup = sol.clone();
+        dup[1] = dup[0];
+        assert_all(&eng, &dup, &Error::NotDistinct, "NotDistinct");
+
+        // IndexOutOfRange (F11): first non-leaf value and u32::MAX.
+        let max_leaf = 1u32 << (p.collision_bit_length() + 1);
+        for bad in [max_leaf, u32::MAX] {
+            let mut oor = sol.clone();
+            oor[0] = bad;
+            assert_all(&eng, &oor, &Error::IndexOutOfRange, "IndexOutOfRange");
+        }
+
+        // OrderingFailed(r), every round: swap the first two subtrees at
+        // level r-1. Blocks of 2^(r-1) leaves stay pair-aligned, so all
+        // rounds < r pass untouched; at round r the collision still holds
+        // (XOR is symmetric) but left > right breaks canonical ordering.
+        for r in 1..=k {
+            let span = 1usize << (r - 1);
+            let mut t = sol.clone();
+            t[..2 * span].rotate_left(span);
+            assert_all(
+                &eng,
+                &t,
+                &Error::OrderingFailed(r as u32),
+                &format!("OrderingFailed({r})"),
+            );
+        }
+
+        // CollisionFailed(r), every round: build the input from harvested
+        // round-(r-1) rows — each internally valid, mutually leaf-disjoint,
+        // with the FIRST TWO differing in their leading collision segment.
+        // All rounds < r pass inside each subtree; at round r the first
+        // pair's collision check fails before anything else is examined.
+        struct HRow {
+            h: Vec<u8>,
+            idx: Vec<EhIndex>,
+        }
+        let init = 1usize << (p.collision_bit_length() + 1);
+        let mut rounds: Vec<Vec<HRow>> = vec![(0..init as EhIndex)
+            .map(|l| HRow {
+                h: eng.leaf_row(l),
+                idx: vec![l],
+            })
+            .collect()];
+        for _t in 1..k {
+            let prev = rounds.last().unwrap();
+            let mut order: Vec<usize> = (0..prev.len()).collect();
+            order.sort_by(|&a, &b| prev[a].h[..cbyte].cmp(&prev[b].h[..cbyte]));
+            let mut next: Vec<HRow> = Vec::new();
+            let mut i = 0;
+            while i + 1 < order.len() {
+                let mut j = i + 1;
+                while j < order.len() && prev[order[j]].h[..cbyte] == prev[order[i]].h[..cbyte] {
+                    j += 1;
+                }
+                for a in i..j {
+                    for b in (a + 1)..j {
+                        let (ra, rb) = (order[a], order[b]);
+                        if !slices_distinct(&prev[ra].idx, &prev[rb].idx) {
+                            continue;
+                        }
+                        let remain = prev[ra].h.len() - cbyte;
+                        let mut h = vec![0u8; remain];
+                        for t2 in 0..remain {
+                            h[t2] = prev[ra].h[cbyte + t2] ^ prev[rb].h[cbyte + t2];
+                        }
+                        let (lo, hi) = if prev[ra].idx < prev[rb].idx { (ra, rb) } else { (rb, ra) };
+                        let mut idx = Vec::with_capacity(prev[lo].idx.len() * 2);
+                        idx.extend_from_slice(&prev[lo].idx);
+                        idx.extend_from_slice(&prev[hi].idx);
+                        next.push(HRow { h, idx });
+                    }
+                }
+                i = j;
+            }
+            rounds.push(next);
+        }
+        for r in 1..=k {
+            let pool = &rounds[r - 1];
+            let m = 1usize << (k - r + 1);
+            let mut sel: Vec<usize> = Vec::new();
+            let mut used = std::collections::HashSet::new();
+            for (pi, row) in pool.iter().enumerate() {
+                if row.idx.iter().any(|i| used.contains(i)) {
+                    continue;
+                }
+                if sel.len() == 1 && row.h[..cbyte] == pool[sel[0]].h[..cbyte] {
+                    continue; // slot 1 must break the collision with slot 0
+                }
+                used.extend(row.idx.iter().copied());
+                sel.push(pi);
+                if sel.len() == m {
+                    break;
+                }
+            }
+            assert_eq!(sel.len(), m, "harvest: not enough disjoint rows at round {r}");
+            let mut input: Vec<EhIndex> = Vec::with_capacity(1 << k);
+            for &pi in &sel {
+                input.extend_from_slice(&pool[pi].idx);
+            }
+            assert_all(
+                &eng,
+                &input,
+                &Error::CollisionFailed(r as u32),
+                &format!("CollisionFailed({r})"),
+            );
         }
     }
 

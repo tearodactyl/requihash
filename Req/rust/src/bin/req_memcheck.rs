@@ -157,7 +157,11 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned();
 
-    let params = [(24u32, 5u32), (48, 5), (72, 5), (96, 5)];
+    // Small-end anchor is (40,4): the former (24,5) anchor is invalid — cbl 4
+    // under-fills expanded rows (REVIEW_REQ.md F14; Params now rejects it),
+    // so SIZING §2a's (24,5) row is historical-only. (40,4) is the smallest
+    // valid sweep point (cbl 8) per the T2.2 calibration protocol.
+    let params = [(40u32, 4u32), (48, 5), (72, 5), (96, 5)];
     let mut rows = measure("reference", &params);
     rows.extend(measure("arena", &params));
 

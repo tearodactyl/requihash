@@ -20,8 +20,7 @@
 //! Cross-validated against the reference solver in tests (`all_solvers_agree`).
 
 use super::Solver;
-use crate::{expand_array, EhIndex, Requihash};
-use crate::blake2b;
+use crate::{slices_distinct, EhIndex, Requihash};
 
 pub struct BucketSolver;
 
@@ -32,21 +31,17 @@ impl Solver for BucketSolver {
         let cbl = p.collision_bit_length();
         let full = (p.k as usize + 1) * cbyte;
         let init = 1usize << (cbl + 1);
-        let n8 = (p.n / 8) as usize;
 
         // Rows as struct-of-arrays; index vectors kept explicit (see module note).
+        // Keying goes through leaf_row_into — the regularity binding's single
+        // site (T2.3 F1) — with one digest scratch shared across all leaves.
         let mut hashes = vec![0u8; init * full];
         let mut idxs: Vec<Vec<EhIndex>> = Vec::with_capacity(init);
         {
-            let mut hout = vec![0u8; p.hash_output()];
-            for leaf in 0..init as u32 {
-                let mut s = engine.base_clone();
-                blake2b::update(&mut s, &(leaf % p.k).to_le_bytes());
-                blake2b::update(&mut s, &(leaf / p.k).to_le_bytes());
-                blake2b::finalize(s, &mut hout);
-                let exp = expand_array(&hout[..n8], full, cbl, 0);
-                hashes[leaf as usize * full..(leaf as usize + 1) * full].copy_from_slice(&exp);
-                idxs.push(vec![leaf]);
+            let mut digest = vec![0u8; p.hash_output()];
+            for (leaf, slot) in hashes.chunks_mut(full).enumerate() {
+                engine.leaf_row_into(leaf as EhIndex, &mut digest, slot);
+                idxs.push(vec![leaf as EhIndex]);
             }
         }
 
@@ -112,7 +107,9 @@ impl Solver for BucketSolver {
                             let ra = order[a] as usize;
                             for c in (a + 1)..j {
                                 let rc = order[c] as usize;
-                                if !idxs[ra].iter().any(|x| idxs[rc].contains(x)) {
+                                // shared helper (crate::slices_distinct), same
+                                // check the arena merge uses (T2.3 F2)
+                                if slices_distinct(&idxs[ra], &idxs[rc]) {
                                     let base = out_hashes.len();
                                     out_hashes.resize(base + new_stride, 0);
                                     let ha = &hashes[ra * stride + cbyte..ra * stride + stride];
@@ -120,15 +117,11 @@ impl Solver for BucketSolver {
                                     for t in 0..new_stride {
                                         out_hashes[base + t] = ha[t] ^ hb[t];
                                     }
-                                    let merged = if idxs[ra] < idxs[rc] {
-                                        let mut v = idxs[ra].clone();
-                                        v.extend_from_slice(&idxs[rc]);
-                                        v
-                                    } else {
-                                        let mut v = idxs[rc].clone();
-                                        v.extend_from_slice(&idxs[ra]);
-                                        v
-                                    };
+                                    let (lo, hi) =
+                                        if idxs[ra] < idxs[rc] { (ra, rc) } else { (rc, ra) };
+                                    let mut merged = Vec::with_capacity(idxs[lo].len() * 2);
+                                    merged.extend_from_slice(&idxs[lo]);
+                                    merged.extend_from_slice(&idxs[hi]);
                                     out_idxs.push(merged);
                                 }
                             }
@@ -154,12 +147,12 @@ impl Solver for BucketSolver {
             if !zero {
                 continue;
             }
-            let idx = &idxs[r];
-            let mut u = idx.clone();
+            let mut u = idxs[r].clone();
             u.sort_unstable();
             u.dedup();
-            if u.len() == idx.len() {
-                sols.push(idx.clone());
+            if u.len() == idxs[r].len() {
+                // move, don't re-clone: each row is visited once (T2.3 F3)
+                sols.push(std::mem::take(&mut idxs[r]));
             }
         }
         sols

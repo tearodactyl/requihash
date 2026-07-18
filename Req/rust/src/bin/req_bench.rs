@@ -5,12 +5,21 @@
 //!   4. backend families: solvers, verifiers, hash backends (seams A/B)
 //!
 //! Run with:  cargo run --release --bin req_bench [-- OPTIONS]
-//!   --json <path>       append machine-readable records (JSON lines)
-//!   --baseline <path>   compare this run against a saved JSONL baseline
+//!   --json <path>       append machine-readable records (JSON lines) after
+//!                       the run; this is the OUTPUT series
+//!   --baseline <path>   compare this run against a saved JSONL baseline (the
+//!                       comparison INPUT). Defaults to the --json path when
+//!                       omitted: the standard workflow is compare-against-
+//!                       the-rolling-series-then-append (comparison happens
+//!                       before appending, so a shared file is sound)
 //!   --band-pct <n>      relative noise floor for comparisons (percent)
 //!   --family            include the SPEC family campaign (gen/substitution/
 //!                       verify-cost across hash x m x params; heavy)
-//!   --tag <name>        machine tag recorded in emitted lines
+//!   --tag <name>        machine tag recorded in emitted lines (also via
+//!                       REQ_BENCH_TAG)
+//!
+//! Standard single-command run on the reference machine: `./bench.sh` (sets
+//! --json/--tag for the machine series; --baseline follows --json).
 //!
 //! Uses only std::time; no external bench framework so it builds
 //! dependency-free. Statistics and the comparison decision rule live in
@@ -365,6 +374,10 @@ fn main() {
         match a.as_str() {
             "--json" => json_path = args.next(),
             "--baseline" => baseline_path = args.next(),
+            "--help" | "-h" => {
+                println!("see the module doc header of req_bench.rs for options");
+                return;
+            }
             "--band-pct" => band_pct = args.next().and_then(|v| v.parse().ok()).unwrap_or(band_pct),
             "--family" => family = true,
             "--tag" => tag = args.next().unwrap_or(tag),
@@ -373,6 +386,10 @@ fn main() {
                 std::process::exit(2);
             }
         }
+    }
+    // Default: compare against the same series we append to (see doc header).
+    if baseline_path.is_none() {
+        baseline_path = json_path.clone();
     }
 
     let mut records: Vec<Record> = Vec::new();

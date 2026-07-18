@@ -133,7 +133,39 @@ struct Params {
         if (k >= n) throw std::invalid_argument("k must be < n");
         if (n % 8 != 0) throw std::invalid_argument("n must be a multiple of 8");
         if ((n % (k + 1)) != 0) throw std::invalid_argument("n must be divisible by k+1");
+        // T2.3 F13: the regularity binding keys a leaf by (leaf % k, leaf / k);
+        // k == 0 is division by zero. k == 1 is well-defined (single round).
+        if (k == 0) throw std::invalid_argument("k must be >= 1 (regularity binding is leaf mod k)");
+        // T2.3 F12: n > 512 makes IndicesPerHashOutput() == 0, so HashOutput()
+        // < n/8 and leaf-row expansion reads past the digest (e.g. (520,4)
+        // passes the three checks above). One BLAKE2b digest must cover at
+        // least one n-bit row.
+        if (n > 512) throw std::invalid_argument("n must be <= 512 (one BLAKE2b digest per row)");
+        // T2.3 F14: ExpandArray/CompressArray use a 32-bit accumulator, so
+        // the collision bit length must be in [8, 25] (zcash's own asserts).
+        // Below 8 the expansion silently under-fills rows; above 25 the
+        // accumulator shifts exceed 32 bits.
+        {
+            unsigned int cbl = n / (k + 1);
+            if (cbl < 8) throw std::invalid_argument("collision bit length n/(k+1) must be >= 8");
+            if (cbl > 25) throw std::invalid_argument("collision bit length n/(k+1) must be <= 25");
+        }
     }
+    // Smallest/largest valid n for a given k (mirror of the Rust
+    // Params::n_bounds; see its doc for the derivation). Valid n are exactly
+    // the multiples of lcm(8, k+1) in [lo, hi]. Returns false when no valid
+    // n exists (k == 0, or k > 63).
+    static bool NBounds(unsigned int k, unsigned int& lo, unsigned int& hi) {
+        if (k == 0) return false;
+        unsigned int m = k + 1;
+        unsigned int a = 8, b = m;
+        while (b != 0) { unsigned int t = a % b; a = b; b = t; } // a = gcd(8, m)
+        unsigned int step = 8 / a * m;                            // lcm(8, m)
+        lo = (8 * m + step - 1) / step * step;                    // cbl >= 8
+        hi = std::min(25 * m, 512u) / step * step;                // cbl <= 25, n <= 512
+        return lo <= hi;
+    }
+
     size_t IndicesPerHashOutput() const { return 512 / n; }
     size_t HashOutput() const { return IndicesPerHashOutput() * n / 8; }
     size_t CollisionBitLength() const { return n / (k + 1); }

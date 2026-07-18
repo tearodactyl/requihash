@@ -1,121 +1,38 @@
-# Req — Requihash miner and verifier
+# Req — the Requihash implementation (Rust, with a C++ differential twin)
 
-Reference implementation of the regularity-repaired variant of Equihash
-proposed by Tang, Sun, and Gong, "On the Regularity of the Generalized Birthday
-Problem" [PAPERS.md has summary and references]
+The evolving Rust implementation of Requihash — the regularity-repaired
+Equihash of Tang, Sun, and Gong ([../PAPERS.md](../PAPERS.md)) — built to
+zebra conventions (`zebra-chain/src/work/equihash.rs`: a `check`-style
+validator plus a solver for round-trip tests) so it can slot in as a drop-in
+at the verifier seam of **Zebro**, the Rust revamp of the Zcash/Zebra
+lineage, while carrying the curve-jumping innovation Zebro's PoW decision
+(D3) needs evidence for: the k-list regularity repair itself, hash-flavor
+substitution (BLAKE2b/BLAKE3 at Seam A), and the m-dial parametrization of
+the whole GBP family (`PoW(n, k, hash, m, keying, context)`, [SPEC.md](SPEC.md)).
 
-Documentation map: [SPEC.md](SPEC.md) — the byte-exact family specification
-(what's implemented vs. specified-only); [ARCHITECTURE.md](ARCHITECTURE.md) —
-code/backend structure, plus which 2016-17 optimization technique each solver
-backend implements and measures; [PLAN.md](PLAN.md) — the live work tracker
-(active work by topic T1–T7, with dependencies and execution order); [BENCHMARK.md](BENCHMARK.md)
-— throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
-solution size and memory across parameters, naive vs. index-pointer;
-[SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — structural attack-surface
-review, including the time-memory-tradeoff (TMTO) test plan (§8-8a);
-[SOLVER_CORPUS.md](SOLVER_CORPUS.md) — standalone historical solver/verifier
-ports (RK/Khovratovich solver, RZ/tromp's pinned single-core-stripped
-solver, RT/tromp's full multi-core solver, CS/Sequihash) for expertise and
-cross-implementation measurement, separate from the pending T1–T7 work;
-[../UNIHASH.md](../UNIHASH.md) — a proposed unifying parametrization across
-Equihash/Requihash/Sequihash (research, not adopted, kept separate from this
-spec so it doesn't pollute pending-implementation context);
-[../Dirs.md](../Dirs.md) — how the surrounding directories (ZKs reference
-clones, Zebro, Zero400/ZeroPerf) relate to this work;
-[../BLAKE/BLAKE.md](../BLAKE/BLAKE.md) — BLAKE-family theory, provenance,
-API flavors, and this project's portability patches to third-party BLAKE2
-code (the hash-primitive companion to this spec's Seam A).
+A byte-exact C++ implementation (`cpp/`, zcashd `src/crypto/equihash`
+conventions, bundled BLAKE2b, no zcash build coupling) serves as the
+differential oracle: the two share the wire format exactly, so a solution
+mined by one verifies in the other. Project-level orientation, the research
+background, and the BLAKE and solver-corpus tracks live one level up —
+[../README.md](../README.md).
 
-## Origin and scope
+## Documentation map (Req-owned documents)
 
-This effort started from Zebro's own PoW decision (D3, `~/Work/ZK/Zebro/CONSENSUS.md`
-§2.2): Zebro is a Rust rewrite migrating away from the Zcash/Zero C++ lineage,
-and needed a real evidence base before picking a parameterized PoW spine. That
-need drove an Equihash literature/implementation review
-([../Equihash.md](../Equihash.md), [../SOLVERS.md](../SOLVERS.md)), which
-surfaced both the regularity mis-specification the 2025 paper repairs
-(Requihash) and concrete portability/optimization gaps in existing solvers —
-this directory is the working implementation that resulted, feeding Zebro's
-M3 evidence package back. It is a research and reference-implementation
-effort, not a production node: the actual Zero Currency production chain
-(release candidate 4.0.1, incremental C++, stock Equihash, not Rust/Zebra-code-compatible)
-lives in `Zero400`/`ZeroPerf`, tracked separately — see [../Dirs.md](../Dirs.md).
-
-This directory delivers two independent implementations that share a byte-exact
-wire format so a solution mined by one verifies in the other:
-
-- `cpp/` — C++17, following the zcash `src/crypto/equihash` conventions (BLAKE2b
-  personalization, minimal/compressed solution encoding, distinct-index and
-  ordering checks). Standalone: bundles its own BLAKE2b, no zcash build coupling.
-- `rust/` — Rust, following the zebra `zebra-chain/src/work/equihash.rs` verifier
-  conventions (a `check`-style validator plus a solver for round-trip tests).
-
-## Project direction and history
-
-Three stages, in order: (1) the Equihash literature/implementation review
-([../Equihash.md](../Equihash.md) — history, the 2016-17 ASIC-defeat
-mechanism, the 2025 theory; [../SOLVERS.md](../SOLVERS.md) — primary-source
-solver history: the original authors' reference implementation, xenoncat's
-index-pointer derivative, tromp's full commit history and its integration
-into zcashd); (2) the Requihash repair this review surfaced, specified and
-cross-validated here (§"What Requihash changes" below); (3) the current,
-ongoing work — implementation quality, concurrency, and memory-sizing fitness
-across parameters, which superseded further hash-vs-hash comparison as the
-priority once the ARM blake2b/blake3 campaign answered that question
-([PLAN.md](PLAN.md) §1 topic T2). The single biggest open item across all
-of Req/ is compact index-pointer storage (`Req/PLAN.md` T2.4 / legacy A6) — it unblocks
-(200,9)-scale mining, gives an honest memory floor, and is the prerequisite
-for the TMTO experiments in `SECURITY_ANALYSIS.md` §8. [PLAN.md](PLAN.md) is
-the authoritative, continuously-updated status tracker; nothing below should
-be trusted over it for "what's done vs. not."
-
-## How to read this documentation
-
-Pick the entry point that matches what you're doing, not the file that sounds
-closest to your question — several documents cover adjacent ground and each
-has one clear owner (cross-references below say who).
-
-- **First time here, want the shape of the whole thing.** Read this README
-  top to bottom (10 minutes), then skim [../Equihash.md](../Equihash.md)'s
-  Findings section (F-A1-F-A11) for the research background. Everything else
-  is reference material to dip into once you have a specific question.
-- **Tracking design, spec, or status.** [SPEC.md](SPEC.md) is the frozen
-  normative wire format (what's implemented vs. specified-only, per
-  configuration point). [PLAN.md](PLAN.md) is the live, broader work tracker
-  (all groups, all in-flight items) — cite SPEC for "what the format is,"
-  cite PLAN for "what's being worked on and by when."
-- **Reviewing results or measured conclusions.** [BENCHMARK.md](BENCHMARK.md)
-  for throughput/timing; [SIZING.md](SIZING.md) for memory/solution-size data
-  across parameter sweeps (including the paper's own published figures and a
-  documented correction trail). Both are evidence-graded (Measured/Reported/
-  Structural/Hypothesis) — check the grade before citing a number elsewhere.
-- **Investigating, debugging, or optimizing a specific solver/hash backend.**
-  [ARCHITECTURE.md](ARCHITECTURE.md) — the seam/trait structure, directory
-  layout, and (§7) exactly which 2016-17 optimization technique each backend
-  implements, with measured before/after numbers for each.
-- **The BLAKE / hash-primitive track (UniBlake).** A separate, independent
-  track from the solver work. [../BLAKE/UniBlake.md](../BLAKE/UniBlake.md) is
-  the design (unified C/C++ BLAKE2b: dispatch, forced-impl, oracle gate,
-  snapshot, stable-API reference §7); [../BLAKE/uniblake/STATUS.md](../BLAKE/uniblake/STATUS.md)
-  is the PoC state (green on arm64 M4, U0–U3 + NEON done, U4–U6 open);
-  [../BLAKE/Platforms.md](../BLAKE/Platforms.md) is the x86-SIMD/NEON hardware
-  reference. [../BLAKE/BLAKE.md](../BLAKE/BLAKE.md) is the vendoring decision
-  record; [../BLAKE/uniblake/PROVENANCE.md](../BLAKE/uniblake/PROVENANCE.md)
-  the single provenance manifest for all vendored BLAKE2 bytes.
-- **Doing security/adversarial review, or picking up a TMTO/hypothesis
-  experiment.** [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) end to end — the
-  shortcut hunt, the lessons (L1-L8) and hypotheses (H1-H5), and the
-  step-wise experiment plan (§8) with its counting methodology (§8a). Start
-  at the critical path note (1→2→3) rather than reading the whole file if
-  you're picking up implementation work, not doing analysis.
-- **Understanding why Requihash exists at all, or the wider industry
-  context.** [../Equihash.md](../Equihash.md) (history, defeat, 2025 theory,
-  findings) and [../SOLVERS.md](../SOLVERS.md) (primary-source solver
-  history) — both live one level up in `Requihash/`, since they're about the
-  problem and the field, not this specific codebase.
-- **Figuring out how this relates to Zebro, ZKs, or Zero400/ZeroPerf.**
-  [../Dirs.md](../Dirs.md) — the directory map, including which surrounding
-  repos are safe to read-and-cite versus edit.
+[SPEC.md](SPEC.md) — the byte-exact family specification (what's implemented
+vs. specified-only); [PLAN.md](PLAN.md) — the live work tracker (topics
+T1–T7; trust it over any other doc for status); [ARCHITECTURE.md](ARCHITECTURE.md)
+— code/backend structure, plus which 2016-17 optimization technique each
+solver backend implements and measures (§7); [BENCHMARK.md](BENCHMARK.md) —
+throughput measurements and harness fitness; [SIZING.md](SIZING.md) —
+solution size and memory across parameters, naive vs. index-pointer, with
+the valid-parameter bounds table; [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)
+— structural attack-surface review and the TMTO test plan (§8-8a);
+[SOLVER_CORPUS.md](SOLVER_CORPUS.md) — the standalone historical solver
+ports (RZ/RK/RT/CS); [REVIEW_REQ.md](REVIEW_REQ.md) — the
+implementation-quality review record (findings F1–F14, corner-case
+inventory); [BENCH.md](BENCH.md) — the shared measurement discipline.
+Cite SPEC for "what the format is", PLAN for "what's being worked on".
 
 ## What Requihash changes
 
@@ -148,6 +65,7 @@ as the concrete regularity binding, documented in `cpp/requihash.h`).
     rust/  : cargo test --manifest-path rust/Cargo.toml
     cross  : cpp/build/req_gen vectors   (writes vectors/*.json)
              cargo run --manifest-path rust/Cargo.toml --bin req_xcheck -- vectors
+    bench  : rust/bench.sh   (standard reference-machine series, BENCH.md discipline)
 
 ### Rust/Cargo topology — no workspace, each crate stands alone
 
@@ -175,9 +93,9 @@ differential oracle.)
 **Expected usage: `cd` into the crate you want, then plain `cargo`
 commands** — never `--manifest-path` from `Req/`'s own root for anything
 under `SOLVER_CORPUS/` (that flag is only shown above for `rust/`, which
-predates `SOLVER_CORPUS/` and is `Req/README.md`'s own existing
-convention; either form works for a single-crate command, `cd` is just
-less error-prone once path-dependent crates are involved):
+predates `SOLVER_CORPUS/` and is this file's own existing convention;
+either form works for a single-crate command, `cd` is just less
+error-prone once path-dependent crates are involved):
 
     cd Req/SOLVER_CORPUS/reqbench && cargo test
     cd Req/SOLVER_CORPUS/rz        && cargo test
@@ -205,11 +123,17 @@ solution mined by the C++ miner, serialized to its minimal wire form, is decoded
 and verified by the independent Rust verifier (byte-exact BLAKE2b, leaf keying,
 and encoding).
 
-- C++ `req_test`: BLAKE2b-512 known-answer; param rejection; solve+verify (48,5)
-  and (72,5); minimal-encoding round trip; Table 3 wire sizes at (200,9).
+- C++ `req_test`: BLAKE2b-512 known-answer; parameter-bound rejection
+  (F12–F14) and `NBounds` exhaustive agreement; solve+verify (48,5) and
+  (72,5); minimal-encoding round trip; the full corner-case matrix
+  (near-misses, out-of-range indices, per-round collision/ordering tampers);
+  Table 3 wire sizes at (200,9).
 - Rust `cargo test`: same coverage plus a regularity check (a swapped-leaf
-  variant of a valid solution is rejected).
-- Cross-check: Rust verifies both C++ vectors — `CROSS-CHECK PASS (2 vectors)`.
+  variant of a valid solution is rejected), the exact-`Error`-variant
+  rejection-path matrix across all three verifiers, and `n_bounds`/`valid_n`
+  exhaustive agreement with the constructor.
+- Cross-check: Rust verifies both C++ vectors plus the 46 official Zcash
+  Equihash KATs (routed by keying) — `CROSS-CHECK PASS`.
 
 Paper Table 3 wire sizes are confirmed at Zcash production params (200,9):
 Equihash-compatible encoding = 1344 bytes, Requihash compact encoding = 1280
@@ -224,13 +148,13 @@ examples in both languages.
 | Seam | Backends (Rust) | Backends (C++) |
 |---|---|---|
 | Hash (A) | `scalar` (bundled BLAKE2b), `simd` (blake2b_simd, feature-gated) | scalar (bundled) |
-| Solve (B) | `reference`, `arena`, `bucket` (2016-17 incomplete sort), `parallel` (rayon, feature-gated) | `Solve` (reference), `SolveArena` |
+| Solve (B) | `reference`, `arena`, `bucket` (2016-17 incomplete sort), `parallel` (rayon, feature-gated), `pointer` (prototype, unregistered — PLAN T2.4) | `Solve` (reference), `SolveArena` |
 | Verify | `reference`, `arena`, `early` | `IsValidSolution` (reference), `IsValidSolutionEarly` |
 
-All backends are proven equivalent: `all_solvers_agree`, `all_verifiers_agree`,
-`arena_matches_reference`, and the SIMD hasher passes the self-test gate
-(`simd_hasher_matches_scalar`) that autodetect requires before adopting any
-accelerated backend. Build the Rust accelerated tiers with
+All registered backends are proven equivalent: `all_solvers_agree`,
+`all_verifiers_agree`, `arena_matches_reference`, and the SIMD hasher passes
+the self-test gate (`simd_hasher_matches_scalar`) that autodetect requires
+before adopting any accelerated backend. Build the Rust accelerated tiers with
 `--features rayon,simd`.
 
 ## Security analysis
@@ -253,7 +177,10 @@ solve time is dominated by the merge (76-87%), and inside the merge by heap
 allocation (59% of samples), not by BLAKE2b (17%) — so the first optimization is
 arena allocation in the solver, not SIMD hashing. The verifier is a flat ~7 us
 (~140k/s) and needs no acceleration. See [ARCHITECTURE.md](ARCHITECTURE.md) for
-the mix-and-match backend structure this motivates.
+the mix-and-match backend structure this motivates. The single biggest open
+implementation item is the production index-pointer backend
+([PLAN.md](PLAN.md) T2.4) — it unblocks (200,9)-scale mining, gives an honest
+memory floor, and is the prerequisite for the TMTO experiments.
 
 ## Why not mine (200,9) here
 
@@ -268,8 +195,11 @@ index-pointer optimisation is the whole point of Requihash (Equihash.md F-A4).
 
 ## Key implementation note
 
-The regularity constraint lives in one place in each implementation:
-`GenerateHash` / `leaf_row`, which keys leaf `i` by `(i mod k, i / k)` — list
-class `i mod k` is the regularity binding, `i / k` the intra-class counter that
-keeps every leaf distinct. Removing the `i mod k` term recovers single-list
-Equihash. This is the minimal, client-side-only change the paper describes.
+The regularity constraint lives in one place in each implementation — C++:
+`GenerateHash`; Rust: `leaf_row_into` (the allocation-free carrier of the
+binding; `leaf_row` and every hot leaf-fill loop route through it, per
+[REVIEW_REQ.md](REVIEW_REQ.md) F1). It keys leaf `i` by `(i mod k, i / k)` —
+list class `i mod k` is the regularity binding, `i / k` the intra-class
+counter that keeps every leaf distinct. Removing the `i mod k` term recovers
+single-list Equihash. This is the minimal, client-side-only change the paper
+describes.
