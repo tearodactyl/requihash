@@ -377,3 +377,100 @@ consensus-stack yardstick (zebro-bench's `equihash_verify`), a useful sanity
 anchor. The m dial behaves as designed: cost scales mildly sublinearly in m
 (iteration rounds are single-block), and (144,5) at m=16 — exactly the
 `2^k·m = 512` budget bound — still verifies cheaper than (200,9) at m=1.
+
+## 10. Round 3: `linux-arm64-vm` — first cross-platform regularized array
+
+First measurement round on a second platform (2026-07-17), and the start of
+the regularized-array discipline: same dimensions on every machine-of-record
+— {implementation × backend × (n,k) × metric}, min/median/MAD per cell,
+JSONL per machine. **Machine**: aarch64 Linux VM, 4 vCPU on a virtualized
+Apple core (probe: `impl=0x61`), 3.9 GB RAM, rustc 1.97.1 / gcc (gnu17),
+tag `linux-arm64-vm`. VM-grade caveat applies (virtualization jitter), but
+repeatability was measured, not assumed: a second full round against the
+first compared **24/24 records within the noise band** (0 wins, 0
+regressions). Artifacts: `baselines/linux-arm64-vm.jsonl` (60 records, both
+rounds), `SOLVER_CORPUS/rk/baselines/linux-arm64-vm.jsonl` (4 cases).
+
+### 10.1 Req core array (Rust, release, defaults)
+
+| Metric | (48,5) | (72,5) | (96,5) |
+|---|---|---|---|
+| leaf hash ns/leaf | 129.2 | 122.0 | 130.5 |
+| solve-reference ms | 0.4 | 5.6 | 108.0 |
+| solve-arena ms | 0.2 | 3.4 | 66.5 |
+| solve-bucket ms | 0.2 | 3.2 | 58.9 |
+| verify µs (reference/arena/early) | 5.6/4.7/4.1 | 5.8/–/– | 5.8/–/– |
+| gen share of solve | 20.7% | 18.8% | 15.2% |
+
+Shape matches the M4 record: merge-dominated, arena ≈ 1.6×, bucket best,
+verifier flat.
+
+### 10.2 C++ vs Rust, same machine, same params (extends §5)
+
+| | C++ ref | Rust ref | C++ arena | Rust arena | C++ verify | Rust verify |
+|---|---|---|---|---|---|---|
+| (96,5) | 177.1 ms | 108.0 ms | 112.4 ms | 66.5 ms | 9.3 µs | 5.8 µs |
+
+Rust ~1.6–1.7× faster across both solve backends and the verifier on this
+platform/compiler pair (g++ -O2 vs rustc lto). First measured instance of
+T4.5's cross-language comparison.
+
+### 10.3 Memory array (`req_memcheck`, counting allocator)
+
+| (n,k) | reference | ratio vs naive floor | arena | full-index model | measured/model |
+|---|---|---|---|---|---|
+| (40,4) | 135.6 KB | 30.1× | 67.5 KB | 99.8 KB | 1.36× |
+| (48,5) | 136.8 KB | 27.4× | 82.9 KB | 145.5 KB | 0.94× |
+| (72,5) | 1.87 MB | 18.4× | 2.07 MB | 2.30 MB | 0.81× |
+| (96,5) | 55.1 MB | 27.6× | 66.0 MB | 36.75 MB | 1.50× |
+
+The SIZING §1c full-index model holds on this second platform in the same
+0.8–1.5× band it was calibrated to on macOS — cross-platform validation of
+the model, and the (40,4) anchor replacing the invalidated (24,5) is now
+measured (30.1×).
+
+### 10.4 UniBlake: first Linux/gcc run (new platform validation)
+
+`ub_test` **ALL GREEN** on aarch64 Linux/gcc — previously validated only on
+arm64 macOS/clang; the NEON kernel passes the self-test gate here too.
+Kernel array (`ub_kbench`, leaf shape prefix=140/out=50):
+
+| kernel | ns/leaf | bulk MiB/s |
+|---|---|---|
+| ref | 124.2 | 1174 |
+| ref_unrolled | **108.5** | **1435** |
+| neon | 257.8 | 510 |
+
+NEON = 0.43–0.48× (loses *harder* than bare-metal M4's 0.55–0.70×) —
+another datapoint for T1.5's "NEON stays parked on big cores." Dispatch tax
+0.23% median. Cross-check across languages: Rust's scalar leaf hash
+(122–130 ns/leaf, §10.1) ≈ uniblake's C ref kernel (124.2) on identical
+shape — Seam A parity across implementations, measured. **Portability
+finding**: `ub_bench.c`/`ub_kbench.c` need `-std=gnu99` (or
+`_POSIX_C_SOURCE`) on glibc for `clock_gettime`'s `timespec` — a BUILD.md
+gap for the Linux directions; library sources compile clean under c99.
+
+### 10.5 Corpus array (RK) and machine-limit exclusions
+
+RK (`rk_bench`, 5 reps, two-instrument memory):
+
+| case | wall median | allocator peak | OS RSS |
+|---|---|---|---|
+| n100_k4 | — | 548 MB | 810 MB (flagged: 32% disagree) |
+| n108_k5 | 974 ms | 149 MB | 338 MB (flagged: 56% disagree) |
+
+The allocator/RSS disagreement flags are the harness working as designed;
+on a VM the RSS side includes virtualization overhead — treat allocator
+numbers as primary here. Exclusions, with reasons: **RZ** — measured 6.27
+GB peak (its own STATUS.md) exceeds this VM's 3.5 GB available; also its
+`build.rs` resolves the vendored tromp C source via the local cargo
+registry cache, absent on a fresh machine (environment-portability note
+for the port). **CS C++** — needs cmake, not present in this VM. **cs-rs**
+— 2/2 tests pass but no bench binary (the known T4.2 gap, reconfirmed).
+
+### 10.6 PLAN corrections surfaced by this round
+
+`rz_bench` is *already* reps+provenance+memory per its own module docs and
+STATUS.md §6 numbers — T4.3's "fix rz_bench first" precondition is stale;
+what actually blocks RZ re-baselining on new machines is memory (6.27 GB)
+and the registry-cache dependency above.

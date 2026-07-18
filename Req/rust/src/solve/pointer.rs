@@ -83,7 +83,16 @@
 //! 3. **A bucket-addressed variant matching tromp's `(bucket, slot)` scheme
 //!    exactly** (highest effort) — only worth it if profiling after (1) and
 //!    (2) shows plain-`Vec`-row-indexing overhead is a real bottleneck;
-//!    speculative until measured, not a default next step.
+//!    speculative until measured, not a default next step. The gate is
+//!    quantified in `ARCHITECTURE.md` §7a.4: node-array share of peak
+//!    T >= 40% (req_memcheck tagged breakdown) OR merge-sample attribution
+//!    M >= 20% (sampling profile), at production-scale k.
+//!
+//! A natural stage 4 exists beyond these three — post-retrieval (don't
+//! store full provenance; re-derive indices after root detection),
+//! resolving provenance to the same lossy-but-recoverable standard the
+//! collision search already uses. Rationale and gating:
+//! `ARCHITECTURE.md` §7a.8.
 //!
 //! **Language/style note, stated once here rather than re-derived later:**
 //! stay in Rust, extending this file — do not port tromp's C bit-packing

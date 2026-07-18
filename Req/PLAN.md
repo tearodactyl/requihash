@@ -70,12 +70,14 @@ specs for T2.1–T2.3 are in §3.*
 | T2.1 | Concurrency audit of the merge/sort phase (bucket-parallel merge) | Ready | — | `parallel.rs` parallelizes only leaf-gen today; full spec §3 |
 | T2.2 | Memory-fitness pass: real vs. modeled peak across the sweep | Ready — **run gated on explicit owner approval** | reads `SIZING.md` | full spec §3. Calibration protocol agreed 2026-07-17: small points first ((40,4),(80,4),(48,5),(72,5),(96,5)) to calibrate formulas before anything predicted >4 GB or >30 min. F14 caps the sweep: k=5 ends at (144,5), k=7 at (200,7); SIZING §2a's (24,5) anchor is invalid (degenerate cbl 4) — re-anchor the small end |
 | T2.3 | Impl-quality review of `solve/` + `verify/` | Active (fixes landed) | — | findings F1–F14 + resolutions + corner-case inventory in `REVIEW_REQ.md`: F10 vacuous-root-check bug (fixed ×3, falsified regression test), F11 index-range gap (fixed ×5), F12/F13/F14 parameter-bound gaps (n<=512, k>=1, cbl ∈ [8,25]; fixed both languages), F1 binding consolidated (`leaf_row_into`) + README amended, full rejection-path matrix Rust+C++. Remaining: M4 re-bench (`rust/bench.sh`), SPEC clarification (F11–F14), encoding-seam audit, rejection vectors |
-| T2.4 | Production index-pointer backend | Active (prototype done) | — | `solve/pointer.rs` proven at (48,5)/(72,5); needs counting-sort, KAT-validation, memory-measure to enter `all_solvers()`. **On completion: revisit F8** (`REVIEW_REQ.md`) — pointer `Solver`-trait/registration decision |
+| T2.4 | Production index-pointer backend | Active (prototype done) | — | `solve/pointer.rs` proven at (48,5)/(72,5); needs counting-sort, KAT-validation, memory-measure to enter `all_solvers()`. **Design requirement (2026-07-17): bucket geometry is a measured dial, not an inherited constant** — b/σ parametrized in the backend, swept under `reqbench` per machine, optimum recorded in `BENCHMARK.md` with provenance; rationale `ARCHITECTURE.md` §7a.7. **On completion: revisit F8** (`REVIEW_REQ.md`) — pointer `Solver`-trait/registration decision |
+| T2.5 | Complete techniques 3-4: static merge allocation + in-place merge | Ready | (4) re-estimate after T2.4 | Design + impact estimates: `ARCHITECTURE.md` §7a.6. (3) is representation-independent (est. 5-15% time, 20-35% peak; ~2-3 session hours) and includes the exact pre-pass output-count strategy (§7a.3) over slack heuristics; (4) cuts the full-index dominant term ~33% but shrinks to marginal once T2.4 lands — sequence after, re-estimate then (~3-4 h if still warranted). Cache-structure experiments (associativity/layout/lifetime-segregation/fused-count-shuttle, §7a.10) ride the same sweeps; the fused next-round count is the first candidate |
 
 **Order:** T2.1/T2.3 can start immediately and in parallel; T2.2 and T2.4
 inform each other (the memory-fitness target is stable once the pointer
 backend lands) — do T2.4 then re-run T2.2, or run T2.2 on the current
-backends first and re-run after.
+backends first and re-run after. T2.5(3) can slot in anytime (it tightens
+T2.2's model-vs-measured band); T2.5(4) waits for T2.4's re-estimate.
 
 ### T3 — Security / TMTO steepness (the solver-track headline)
 
@@ -99,11 +101,11 @@ model for C-native timing.*
 
 | # | Item | Status | Depends on | Notes |
 |---|---|---|---|---|
-| T4.1 | requihash (`Req/rust`) full run | Ready | — | existing `req_bench`/`req_profile`/`req_memcheck`; gen-vs-merge split, sampling profile, two-instrument memory → `Req/baselines/` |
+| T4.1 | requihash (`Req/rust`) full run | Active (VM leg done) | — | `linux-arm64-vm` array recorded 2026-07-17 (`BENCHMARK.md` §10, 2 rounds, 24/24 repeatable, memcheck + model cross-validation); M4 leg still pending (`rust/bench.sh`) |
 | T4.2 | `cs-rs` bench | Ready | **add `cs_bench` first** | no bench binary yet (RZ-style gap); add a `reqbench` one mirroring rz/rk, then baseline |
-| T4.3 | `rz` + `rk` re-baseline | Ready | **fix `rz_bench` first** | `rz_bench` still single-sample (BENCH.md §2 gap) — bring to reps+provenance+auto-memory, then baseline both |
+| T4.3 | `rz` + `rk` re-baseline | Active (RK VM leg done) | — | **stale precondition removed 2026-07-17**: `rz_bench` is already reps+provenance+memory (its module docs + STATUS.md §6). RK baselined on `linux-arm64-vm` (BENCHMARK §10.5); RZ blocked on new machines by its 6.27 GB peak and a registry-cache build.rs dependency (§10.5) |
 | T4.4 | uniblake C on x86 + weak ARM | Blocked | hardware / Docker / WSL2 | M4-only numbers are anecdotes (`Platforms.md` §6); x86 exercises the cpuid probe, weak ARM is where NEON might win (feeds T1.4/T1.5) |
-| T4.5 | C/C++ references (`Req/cpp/req_bench`, `cs`, `rk/original`, RT) | Ready | — | cross-language C++-vs-Rust comparison + **RT thread-scaling** (`-t 1/2/4/8`) — the comparative-corpus payoff |
+| T4.5 | C/C++ references (`Req/cpp/req_bench`, `cs`, `rk/original`, RT) | Active (first leg done) | — | C++-vs-Rust measured on `linux-arm64-vm` (Rust 1.6–1.7× across solve+verify, BENCHMARK §10.2); remaining: `cs` (needs cmake), `rk/original`, **RT thread-scaling** (`-t 1/2/4/8`) |
 
 **Order:** T4.2 and T4.3 each require a small build step first (add/fix a
 bench binary). T4.4 is the one gated on hardware. T4.5 delivers the

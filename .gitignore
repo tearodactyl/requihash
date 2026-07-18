@@ -1,4 +1,5 @@
 Cargo.lock
+*.o
 BLAKE/*/build
 BLAKE/*/target
 Req/*/build/

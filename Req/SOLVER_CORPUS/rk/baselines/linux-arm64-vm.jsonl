@@ -1,0 +1,4 @@
+{"key":"find_proof/n60_k4","units":1,"reps":5,"min_ns":3060250,"median_ns":3125375,"mad_ns":9292,"tag":"linux-arm64-vm","arch":"aarch64","git_rev":"81c93be","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n90_k5","units":1,"reps":5,"min_ns":33526791,"median_ns":35531333,"mad_ns":1419334,"tag":"linux-arm64-vm","arch":"aarch64","git_rev":"81c93be","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n100_k4","units":1,"reps":5,"min_ns":2114770084,"median_ns":2130262418,"mad_ns":6102083,"tag":"linux-arm64-vm","arch":"aarch64","git_rev":"81c93be","git_dirty":true,"profile":"release"}
+{"key":"find_proof/n108_k5","units":1,"reps":5,"min_ns":970016667,"median_ns":974389126,"mad_ns":3036000,"tag":"linux-arm64-vm","arch":"aarch64","git_rev":"81c93be","git_dirty":true,"profile":"release"}
