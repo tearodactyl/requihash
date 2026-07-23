@@ -2,7 +2,7 @@
 //! `Req/rust` and every port under `Req/SOLVER_CORPUS/`. See `Req/BENCH.md`
 //! for the discipline this crate implements and why.
 //!
-//! Three pieces, usable independently:
+//! Four pieces, usable independently:
 //! - [`stats`]: timing statistics (min/median/MAD), JSON-lines emission,
 //!   baseline loading, and the Win/Regression/Noise/New comparison rule.
 //! - [`provenance`]: git commit/dirty-tree/build-profile stamping, so a
@@ -10,6 +10,10 @@
 //! - [`mem`]: a counting global allocator plus an OS-RSS cross-check, so a
 //!   peak-memory figure is corroborated by two independent instruments
 //!   before being trusted (`Req/BENCH.md` §4).
+//! - [`run_record`]: the unified cross-implementation run-record schema
+//!   (`RunRecord`) every measurement in `Req/SOLVER_CORPUS/RUN_DATA.jsonl`
+//!   converges on — Rust drivers emit it via this module; C++ drivers
+//!   (which don't depend on this crate) match its exact JSON shape by hand.
 //!
 //! No external dependencies, `std` only — a standalone `SOLVER_CORPUS` port
 //! must stay usable with no other context needed from this repository
@@ -18,6 +22,7 @@
 
 pub mod mem;
 pub mod provenance;
+pub mod run_record;
 pub mod stats;
 
 use std::time::Instant;

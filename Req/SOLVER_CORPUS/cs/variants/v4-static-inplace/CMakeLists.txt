@@ -21,6 +21,9 @@ target_include_directories(cs_klist_v4 PUBLIC src "${BLAKE2_REF_DIR}")
 add_executable(cs_v4_gen src/cs_v4_gen.cpp)
 target_link_libraries(cs_v4_gen PRIVATE cs_klist_v4)
 
+add_executable(cs_v4_bench src/cs_v4_bench.cpp)
+target_link_libraries(cs_v4_bench PRIVATE cs_klist_v4)
+
 enable_testing()
 add_executable(cs_v4_differential tests/differential.cpp)
 target_link_libraries(cs_v4_differential PRIVATE cs_klist_v4)

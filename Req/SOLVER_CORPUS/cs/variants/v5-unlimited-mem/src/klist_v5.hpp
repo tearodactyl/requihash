@@ -72,7 +72,7 @@ public:
 
     FixedUint compute_item(unsigned i, unsigned j) const;
 
-    // Diagnostic counters, exposed for the bench harness (variants/README.md):
+    // Diagnostic counters, exposed for the bench harness (../../README.md):
     // how many BLAKE2b compression-relevant update() calls the class-prefix
     // precomputation actually saved vs. a naive per-leaf full-message hash.
     mutable uint64_t leaf_hashes_computed = 0;

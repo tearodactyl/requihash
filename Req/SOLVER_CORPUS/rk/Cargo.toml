@@ -17,6 +17,10 @@ path = "src/bin/rk_gen.rs"
 name = "rk_bench"
 path = "src/bin/rk_bench.rs"
 
+[[bin]]
+name = "rk_single_gen"
+path = "src/bin/rk_single_gen.rs"
+
 [dependencies]
 blake2b_simd = { version = "1", default-features = false }
 reqbench = { path = "../reqbench" }

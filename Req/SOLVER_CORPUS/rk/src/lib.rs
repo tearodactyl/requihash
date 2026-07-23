@@ -157,6 +157,59 @@ pub struct Equihash {
     nonce: Nonce,
 }
 
+/// Pre-flight (n,k) validity check for RK drivers -- call BEFORE
+/// constructing an `Equihash` and before spending any time/memory, so a
+/// bad point is rejected immediately with a message naming which rule
+/// failed. `Equihash::new` itself performs NO validation at all (it is a
+/// generic recursive solver that will simply misbehave -- wrong results,
+/// a panic deep in `resolve_collisions`, or an unbounded-looking run --
+/// at a bad point rather than erroring up front), so this check is not
+/// redundant with anything already enforced.
+///
+/// Rule set is RK/Khovratovich-specific, NOT Req/Equihash's own and NOT
+/// CS/Sequihash's either (different convention: k here is TREE-DEPTH,
+/// solution size 2^k, matching Equihash's own convention). Genuinely
+/// only TWO rules, not three -- an n%8==0 byte-alignment rule was
+/// present in an earlier version of this check and was WRONG: it was
+/// imported from Req/Equihash's own convention (which truncates its
+/// BLAKE2b digest LENGTH to n/8 bytes) without verifying RK's own hash
+/// path actually needs it. RK's `hash_leaf` always hashes to a fixed
+/// 32-byte/256-bit BLAKE2b digest and extracts bits via a runtime shift
+/// (`FillMemory`'s `buf[j] >> (32 - n/(k+1))`), never truncating the
+/// digest length itself -- so RK works at ANY bit granularity, not just
+/// byte boundaries. Caught because this check rejected (60,4), a point
+/// this project's own earlier benchmark ladder ran successfully many
+/// times (60%8=4, but RK never needed byte alignment) -- see
+/// Req/PLAN.md T5.1. Two real rules remain:
+///   1. k >= 1                 -- algorithm-fundamental (k=0 divides by
+///                                zero the same way it would in any
+///                                Equihash-family leaf keying)
+///   2. n % (k+1) == 0          -- algorithm-fundamental, ell=n/(k+1)
+///                                must be a whole number of bits/round
+///   3. n/(k+1) <= 32           -- ORIGINAL's own documented assumption
+///                                (pow.h: "Assumes that n/(k+1) <=32",
+///                                MAX_N=32 BYTES -- a tighter, RK-specific
+///                                ceiling than Req's n<=512 BITS/BLAKE2b
+///                                cap or CS's own; do not confuse the two)
+pub fn check_nk(n: u32, k: u32) -> Result<(), String> {
+    if k < 1 {
+        return Err("k must be >= 1".to_string());
+    }
+    if n % (k + 1) != 0 {
+        return Err(format!(
+            "n must be divisible by k+1={} (rule 2, algorithm-fundamental: ell=n/(k+1) must be a whole number -- got n={n})",
+            k + 1
+        ));
+    }
+    let ell = n / (k + 1);
+    if ell > 32 {
+        return Err(format!(
+            "n/(k+1) must be <= 32 (rule 3, original pow.h's own documented MAX_N=32-byte assumption -- got ell={ell})"
+        ));
+    }
+    Ok(())
+}
+
 impl Equihash {
     pub fn new(n: u32, k: u32, seed: Seed) -> Self {
         Equihash {
@@ -310,6 +363,28 @@ impl Equihash {
             seed: self.seed,
             nonce: self.nonce,
             inputs: Vec::new(),
+        }
+    }
+
+    /// Runs exactly ONE attempt (initialize_memory + fill_memory +
+    /// resolve_collisions x k) at a caller-supplied nonce, skipping
+    /// find_proof's multi-nonce retry search entirely. Does not check
+    /// for a valid solution -- may return with self.solutions empty at
+    /// this nonce, which is fine for its purpose: isolating a single
+    /// attempt's real peak memory / wall time from the retry loop's own
+    /// confounding effect (README.md "Reconcile the allocator/RSS memory
+    /// disagreement" -- this is that follow-on, executed). Mirrors the
+    /// original's per-iteration loop body in FindProof (pow.cc), minus
+    /// the surrounding `while (nonce < MAX_NONCE)` search and duplicate
+    /// check.
+    pub fn single_attempt(&mut self, nonce: Nonce) {
+        self.nonce = nonce;
+        self.initialize_memory();
+        let bits = self.n / (self.k + 1);
+        self.fill_memory(4u32 << (bits - 1));
+        for i in 1..=self.k {
+            let to_store = i == self.k;
+            self.resolve_collisions(to_store);
         }
     }
 }

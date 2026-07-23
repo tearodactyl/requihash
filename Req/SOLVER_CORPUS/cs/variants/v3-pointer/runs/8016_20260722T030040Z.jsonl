@@ -1,0 +1,1 @@
+{"impl":"cs-v3","lang":"cpp","point":{"n":80,"k_or_K":16,"convention":"list_count_K"},"nonce_or_seed":"00112233445566778899aabbccddeeff","reps":3,"wall_min_ms":177.3201,"wall_median_ms":181.1352,"wall_mad_ms":3.8150,"peak_mem_bytes":108380160,"mem_instrument":"os_rss","solutions_found":1,"git_rev":"987c16b","git_dirty":true,"machine":"arm64/x86_64 (macOS)"}

@@ -1,0 +1,1 @@
+{"impl":"rk-rust","lang":"rust","point":{"n":60,"k_or_K":4,"convention":"tree_depth_k"},"nonce_or_seed":"seed=5,nonce=2","reps":5,"wall_min_ms":2.9021,"wall_median_ms":2.9692,"wall_mad_ms":0.0631,"peak_mem_bytes":2244704,"mem_instrument":"allocator_peak","solutions_found":null,"git_rev":"987c16b","git_dirty":true,"machine":"aarch64 (macos)"}

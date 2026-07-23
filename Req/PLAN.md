@@ -121,9 +121,10 @@ not part of the retired A/B/C scheme — they stay.*
 | Port | Status | Depends on | Notes |
 |---|---|---|---|
 | RZ | Done | — | single-core-stripped `equi_miner.c` = Equihash(144,5), byte-identical vs C, on `reqbench`. (200,8/9 out of scope) |
-| RK | Done | — | Khovratovich reference, param-generic, 8 KAT vectors byte-exact. (192,7)/(200,9) not attempted ((120,4) alone = 162s/10.5GB) |
-| CS | Done (C++ **and** Rust) | — | C++ `cs/` + Rust `cs-rs/` re-port (2026-07-17), both byte-exact vs the 4 Python-reference vectors incl. 2-solution (160,512). C++ is the Rust's differential oracle |
+| RK | Done | — | Khovratovich reference, param-generic, 8 KAT vectors byte-exact, both C++ (`original/`) and Rust (`src/`). (192,7)/(200,9) not attempted. Single-attempt C++-vs-Rust comparison (T5.1): Rust 1.15-1.30x time, 0.52-0.83x memory, stable across an 11-point ladder; (120,4) is the practical ceiling (~10GB either language) |
+| CS | Done (C++ **and** Rust), plus 6 comparative variants | — | C++ `cs/` (base port) + `variants/v1`-`v6` (merge/storage-strategy comparisons, T5.2) + Rust `cs-rs/` re-port, all byte-exact vs the 4 Python-reference vectors incl. 2-solution (160,512). C++ base is the Rust's differential oracle |
 | RT | **Ready — Rust port not started** | — | tromp full multi-core (`pthread_barrier_t`, `-t <nthreads>`). Reference builds natively, trace-identical, thread-invariant at -t 1/2/4. Remaining: cross-check harness, vectors, the port itself (`SOLVER_CORPUS.md` RT section) |
+| Eq-bucket-variants | Done (2 variants) | — | `eq-bucket-variants/{fully-sorted,two-level}` — plain (single-list) Equihash bucket-structure comparison, NOT part of the CS/Sequihash family. Byte-exact against a shared brute-force oracle. Documented only in inline code comments, no directory-level README — whether one is warranted is undecided, not a confirmed gap (T5.3) |
 
 *Discipline note (why RK/RT stalled once): all three were first launched
 as parallel agents targeting (200,9) with no build-env check; all killed
@@ -131,6 +132,109 @@ mid-run. The settled rule — smallest parameter first, continuous
 `STATUS.md` checkpointing, no VM without approval, debug in place — is
 now standing (`feedback-agent-dispatch-discipline`). RT's port, when it
 starts, follows it.*
+
+**T5.1 — RK measurement infra & C++/Rust comparison.** Done. Matched
+single-attempt drivers (`rk_single_gen`/`rk_single_bench`) so
+allocator-peak (Rust) and OS-RSS (C++) answer the same question —
+`rk_bench`'s own multi-nonce-retry comparison conflates the two,
+producing an inflated apparent memory ratio; use the single-attempt
+drivers for any C++-vs-Rust memory claim. Full numbers: `rk/README.md`.
+
+**T5.2 — CS variants V1-V6.** Done (6 variants), with open follow-on
+items:
+- V1 fixed-width ints, V2 bucket-sort, V3 index-pointer storage
+  (deliberately measures the memory *penalty* index pointers incur under
+  Sequihash's k-list regularity — `SECURITY_ANALYSIS.md` §4.1/F-A4), V4
+  static arena, V5 class-prefix BLAKE2b precomputation, V6
+  Khovratovich-idiom structural mirror. Full description/current
+  benchmark table: `cs/README.md`.
+- Two bugs fixed, both in `cs/README.md` "Known issues": V4's index
+  pool over-reserved per-row (16.6GB→1.79GB at (160,512) after the fix;
+  the fix itself introduced an ASan-caught heap-buffer-overflow, resolved
+  by separating two allocators that had been conflated). V6's
+  `RoundTable` did one heap allocation per bucket per round instead of
+  one flat buffer (6.49s→3.81s after the fix).
+- **Open — no benchmark driver for `cs-rs`**: blocks any real
+  CS-vs-Rust timing/memory comparison (unlike RK, which has one in both
+  languages). Concrete next step: a `RunRecord`-emitting driver matching
+  `rk_single_gen.rs`'s shape.
+- **Open — SC0 consolidation decision, not made**: the 7 CS
+  implementations share near-100%-duplicated infrastructure
+  (`fixedint.hpp`, `hashmsg.hpp` for V1-V5, the bench-driver template —
+  confirmed byte-identical modulo namespace renaming) while the actual
+  merge/storage algorithm per variant must stay separate. Undecided:
+  whether shared infrastructure moves to a `cs/common/` directory
+  (mirroring `eq-bucket-variants/common/`'s existing precedent) or a
+  standalone library-style target the other 7 link against. No
+  consolidation code written; still 7 independently-built binaries.
+- **Open — systematic ASan/UBSan sweep, not done**: V4's overflow above
+  was caught only because that code path was already under active
+  ASan-enabled development. V1, V2, V3, V5, V6, the base `cs/` port,
+  `rk/original` (C++), and `rz`'s own C cross-check binary have never
+  been swept the same way. Concrete next step: build each with
+  `-fsanitize=address,undefined`, run its own differential suite against
+  small vectors only (ASan's overhead makes the largest committed
+  vectors, e.g. CS's (160,512), time out — a known, accepted limit, not
+  a gap to close).
+- **Open — backend-specific memory-formula calibration**:
+  `full_index_bytes` (`Req/scripts/equihash_formulas.py`) is calibrated
+  against `solve_reference`-style measurements only, not separately
+  checked against V3/V4/V6's genuinely different storage shapes.
+- **Open — V6's remaining per-merge cost**: after the flat-`RoundTable`
+  fix, V6 is still the slowest CS variant (plausibly `MergeHistory`/
+  `ForkPair` reconstruction + rebuilding the `index1` hash-join table
+  every merge) — not chased further, since V6's stated purpose is
+  structural fidelity, not speed.
+- **Open — V5's allocation fix produced no measurable timing change**:
+  working hypothesis (unconfirmed by a fresh profile) is that V5's
+  BLAKE2b-streaming-API hot path is dominated by a per-leaf state copy
+  that the allocation fix doesn't touch.
+- **Open — index-trimming trade-off mode unported** in all 7 (the
+  paper's own `solve(index_bit_length=N)`); would reuse existing
+  `compute_hash_list`/`hash_merge` primitives.
+- **Open — wider fuzz validation**: currently 4 fixed vectors per
+  implementation; many-random-nonce differential fuzzing at small, fast
+  parameter points not yet attempted.
+
+**T5.3 — Eq-bucket-variants.** Done (2 variants: fully-sorted-buckets,
+two-level 256x256 buckets), correctness-verified against a shared
+brute-force oracle. Documented only via inline code comments — no
+directory-level README exists, and none has been requested or approved;
+not listed as an open item pending someone actually deciding one is
+warranted. Open follow-ons:
+- **Same leaf-hashing allocation fix as CS's V1-V5, not yet applied**
+  to `common/equihash_ref.cpp`'s `compute_leaf`/`leaf_message` — expected
+  similar win (same profiling signature), not measured.
+- **Two-level's cache-locality claim unconfirmed**: its own design
+  rationale (many small `counts`/`cursor` arrays fitting L1 vs.
+  fully-sorted's one large array) hasn't shown up in wall-clock at any
+  point tested so far ((120,5): statistically indistinguishable) — needs
+  a parameter point large enough to actually stress cache residency, not
+  yet identified.
+
+**T5.4 — Cross-corpus follow-ons, not started.**
+- RK vs. `Req/`'s own `reference`/`arena`/`bucket` solvers at matching
+  `(n,k)` — RK predates every 2016-17 memory-reduction technique and
+  should be the slowest/most memory-hungry solver in this corpus; not
+  yet run as a direct comparison.
+- `(192,7)`/`(200,9)` unattempted by any implementation in this whole
+  corpus — RK's own (120,4) ceiling (10.5GB) is the closest proxy by
+  order of magnitude but not a safe extrapolation for k=7/9's different
+  per-tuple cost. Needs an explicit time/memory budget agreed in advance
+  before attempting on any implementation.
+
+**T5.5 — Shared measurement infrastructure.** Done: unified
+`reqbench::run_record::RunRecord` JSON schema (`impl`/`lang`/`point` with
+an explicit tree-depth-k-vs-list-count-K tag/`nonce_or_seed`/timing/
+memory-with-instrument/provenance) and a per-implementation
+`runs/<n><k>_<timestamp>.jsonl` file-naming convention (never a shared
+file across implementations, never an overwrite — `create_new`/`O_EXCL`
+semantics on both languages), used by RK (both languages) and all 7 CS
+implementations. `Req/scripts/equihash_formulas.py` provides
+`req_valid_n`/`cs_valid_n` (cross-checked against `Req/rust`'s own
+constructor tests) and a 5-formula memory-model comparison export
+(`Req/k410_comparison.csv`). All 9 drivers (CS x7, RK x2) reject an
+invalid `(n,k)` before any solve work starts, naming the failed rule.
 
 ### T6 — Node track (Zebro)
 

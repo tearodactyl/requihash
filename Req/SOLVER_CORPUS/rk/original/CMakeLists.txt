@@ -33,3 +33,7 @@ target_link_libraries(equihash PRIVATE rk_pow)
 # JSON vector generator for ../vectors/*.json
 add_executable(rk_vecgen vecgen.cc)
 target_link_libraries(rk_vecgen PRIVATE rk_pow)
+
+# Single-attempt measurement driver (see rk_single_bench.cpp doc comment).
+add_executable(rk_single_bench rk_single_bench.cpp)
+target_link_libraries(rk_single_bench PRIVATE rk_pow)

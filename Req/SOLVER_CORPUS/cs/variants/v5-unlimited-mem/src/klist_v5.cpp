@@ -1,4 +1,5 @@
 #include "klist_v5.hpp"
+#include "hashmsg.hpp"
 #include "blake2.h"
 
 #include <algorithm>
@@ -29,15 +30,17 @@ KListWagnerAlgorithmV5::KListWagnerAlgorithmV5(unsigned n, unsigned k, std::vect
 FixedUint KListWagnerAlgorithmV5::compute_item(unsigned i, unsigned j) const {
     // Non-precomputed path: only used by verify() (a handful of calls,
     // not the hot leaf-generation loop, so no prefix-caching benefit to
-    // chase there).
-    std::string suffix = std::to_string(i) + "-" + std::to_string(j);
-    std::vector<uint8_t> message(nonce_);
-    message.insert(message.end(), suffix.begin(), suffix.end());
+    // chase there). Still switched to the allocation-free builder
+    // (../../README.md) for consistency/correctness parity
+    // with every other variant, even though its own perf impact here is
+    // negligible (cold path).
+    uint8_t msgbuf[cs_common::kMaxMessageBytes];
+    size_t msglen = cs_common::build_leaf_message(nonce_.data(), i, j, msgbuf);
 
-    std::vector<uint8_t> digest(hash_size_);
-    int rc = blake2b(digest.data(), hash_size_, message.data(), message.size(), nullptr, 0);
+    uint8_t digest[64];
+    int rc = blake2b(digest, hash_size_, msgbuf, msglen, nullptr, 0);
     if (rc != 0) throw std::runtime_error("blake2b failed");
-    return FixedUint::from_be_bytes(digest.data(), hash_size_);
+    return FixedUint::from_be_bytes(digest, hash_size_);
 }
 
 // Class-prefix precomputation (H2): absorb nonce+"i-" once into a
@@ -49,31 +52,38 @@ FixedUint KListWagnerAlgorithmV5::compute_item(unsigned i, unsigned j) const {
 // paid once, not that update(suffix)+final is skipped (it can't be,
 // each leaf's digest differs).
 std::vector<HashItem> KListWagnerAlgorithmV5::compute_hash_list_precomputed(unsigned i) const {
-    std::string prefix = std::to_string(i) + "-";
-    std::vector<uint8_t> prefix_msg(nonce_);
-    prefix_msg.insert(prefix_msg.end(), prefix.begin(), prefix.end());
+    // Allocation-free prefix construction (see ../../README.md):
+    // nonce(16) || decimal(i) || '-', no std::string/std::vector.
+    uint8_t prefix_msg[cs_common::kMaxMessageBytes];
+    size_t prefix_len = 0;
+    for (int b = 0; b < 16; ++b) prefix_msg[prefix_len++] = nonce_[b];
+    cs_common::write_uint(i, prefix_msg, &prefix_len);
+    prefix_msg[prefix_len++] = '-';
 
     blake2b_state snapshot;
     if (blake2b_init(&snapshot, hash_size_) != 0) throw std::runtime_error("blake2b_init failed");
-    if (blake2b_update(&snapshot, prefix_msg.data(), prefix_msg.size()) != 0)
+    if (blake2b_update(&snapshot, prefix_msg, prefix_len) != 0)
         throw std::runtime_error("blake2b_update (prefix) failed");
     ++class_prefixes_precomputed;
 
     uint64_t count = uint64_t(1) << ell_;
     std::vector<HashItem> list;
     list.reserve(count);
-    std::vector<uint8_t> digest(hash_size_);
     for (uint64_t j = 0; j < count; ++j) {
         blake2b_state st = snapshot; // cheap struct copy, resumes the cached prefix state
-        std::string suffix = std::to_string(j);
-        if (blake2b_update(&st, suffix.data(), suffix.size()) != 0)
+        // Allocation-free suffix (decimal(j) only, no std::string).
+        uint8_t suffix_buf[10];
+        size_t suffix_len = 0;
+        cs_common::write_uint((unsigned)j, suffix_buf, &suffix_len);
+        if (blake2b_update(&st, suffix_buf, suffix_len) != 0)
             throw std::runtime_error("blake2b_update (suffix) failed");
-        if (blake2b_final(&st, digest.data(), hash_size_) != 0)
+        uint8_t digest[64];
+        if (blake2b_final(&st, digest, hash_size_) != 0)
             throw std::runtime_error("blake2b_final failed");
         ++leaf_hashes_computed;
 
         HashItem item;
-        item.value = FixedUint::from_be_bytes(digest.data(), hash_size_);
+        item.value = FixedUint::from_be_bytes(digest, hash_size_);
         item.index_vector = {(uint32_t)j};
         list.push_back(std::move(item));
     }

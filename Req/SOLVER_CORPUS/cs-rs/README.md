@@ -47,3 +47,9 @@ vectors: `(24,8)`, `(40,16)`, `(64,128)`, and the 2-solution
 `(160,512)` point (~16 s here). `cargo run --bin cs_gen 24 8
 00112233445566778899aabbccddeeff` reproduces the committed
 `[52,38,50,40,46,4,39,60]` exactly.
+
+## Open question
+
+No benchmark driver exists yet (only `cs_gen`, correctness-only) — there
+is currently no timing/memory comparison against the C++ port. See
+`Req/PLAN.md` T5.2.

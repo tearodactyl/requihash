@@ -1,205 +1,162 @@
-# CS — canonical C++ port of the paper's own "Sequihash" k-list reference
+# CS — the Sequihash k-list reference port, and six comparative variants
 
-## Two conventions that differ from this project's own code — read first
+Canonical C++ port of the 2025/1351 paper's own "Sequihash" k-list Wagner
+solver, plus six standalone re-implementations (`variants/v1`–`v6`)
+exploring different merge/storage strategies against the same reference
+oracle. All seven are correctness-tested against the same 4 vectors,
+generated from the actual Python reference, not a re-derivation.
+
+## Conventions — read before touching any code here
 
 1. **`k` is a list count, not a tree-depth exponent.** The Python
-   reference's `k` (`k_list_wagner_algorithm.__init__`, asserted to be a
-   power of 2) is the paper's own `K`, matching its `(n, K=2^k)` table
-   directly — **not** `Req/`'s `(n,k)` convention, where `k` is tree
-   depth and `2^k` is the *solution size*. In this port's public API,
-   `k` **is** the solution size (equal to the paper's `K`), exactly
-   matching the Python reference. `Req/README.md`'s "What Requihash
-   changes" documents the equivalent distinction for Requihash vs.
-   Equihash's own convention — this is the same kind of trap, applied
-   here to CS specifically.
-2. **Leaf encoding is an ASCII decimal string, not a binary one.** The
-   Python reference hashes `nonce + f"{i}-{j}".encode()` — a 16-byte
-   nonce followed by an ASCII string like `b"3-42"` (decimal digits, no
-   leading zeros, no fixed width, literal `-` separator) — **not**
-   `Req/`'s binary `le32(i mod k) || le32(i div k)` encoding. This port
-   reproduces the **string formatting exactly**
-   (`std::to_string(i) + "-" + std::to_string(j)`), not a translation to
-   a binary encoding. `UNIHASH.md` §1 proposes this is a
-   non-cryptographic, likely-accidental artifact of the paper's own
-   Python rather than a principled design choice — worth reading for
-   *why* the incompatibility exists, but does not change this task's
-   scope (a faithful port of the reference as it actually is).
+   reference's `k` (asserted a power of 2) is the paper's own `K`,
+   matching its `(n, K=2^k)` table — **not** `Req/`'s `(n,k)` convention,
+   where `k` is tree depth and `2^k` is the solution size. Every file in
+   this directory uses `k` = solution size, matching the Python
+   reference exactly.
+2. **Leaf encoding is an ASCII decimal string.** `nonce + f"{i}-{j}"`
+   (16-byte nonce, then decimal `i`, `-`, decimal `j`, no leading zeros,
+   no fixed width) — not `Req/`'s binary encoding. Reproduced exactly by
+   every variant here, not translated.
 
-## What this ports
+## What's ported, what's not
 
-`~/Work/ZK/ZKs/Generalized-Birthday-Problem/GBP-solver/k_list_algorithm.py`
-(273 lines, the 2025/1351 paper's own runnable k-list Wagner solver,
-whose own artifact repo names this construction "Sequihash"). Ported:
-`k_list_wagner_algorithm.__init__`/`compute_item`/`hash_merge`/
-`compute_hash_list_on_the_fly` (no-trade-off case only, see "Scope"
-below)/`_solve`/`solve`/`verify_results`, as `cs::KListWagnerAlgorithm`
-in `src/klist.hpp`/`src/klist.cpp`. Method names and control flow are
-kept recognizable against the Python original (constructor ≈ `__init__`,
-`solve()` ≈ `solve()`, `verify()` ≈ `verify_results()`,
-`compute_item()` ≈ `compute_item()`).
+Ported: `k_list_wagner_algorithm.__init__`/`compute_item`/`hash_merge`/
+`compute_hash_list_on_the_fly` (no-trade-off path only)/`_solve`/
+`solve`/`verify_results`. Not ported: `run_with_memory_trace` and all
+`rich.Console`/`Panel` usage (profiling/presentation scaffolding, not
+algorithm) — no variant here has a stdio/logging dependency in its
+algorithm code; each has a separate driver for I/O.
 
-**Not ported**: `run_with_memory_trace` and all `rich.Console`/
-`rich.Panel` usage — profiling/presentation scaffolding mixed into the
-Python file's module scope, not part of the algorithm. `src/klist.hpp`/
-`src/klist.cpp` have no stdio, no logging, no console dependency;
-`src/cs_gen.cpp` (a separate driver) is the only place with I/O.
+**Unported feature, in every variant**: the paper's index-trimming
+trade-off mode (`solve(index_bit_length=N)`) — composes on top of the
+existing `compute_hash_list`/`hash_merge` primitives if wanted later,
+not a redesign.
 
-## Scope: the no-trade-off path only
+## The seven implementations
 
-The Python reference's `solve(index_bit_length=None)` — full-length
-index, no memory/time trade-off — is the only path ported.
-`solve(index_bit_length=N)` (the paper's own index-trimming trade-off
-mode, `_solve` called twice with a partial-index first pass) is a
-separate, more involved feature not exercised by any of this port's
-required vectored KAT points and is not implemented. If wanted later, it
-composes on top of the existing `compute_hash_list`/`hash_merge`
-primitives — `compute_hash_list_on_the_fly`'s two trimmed-index branches
-are the only additional logic needed, not a redesign.
+| | Storage/merge strategy | Built on | Purpose |
+|---|---|---|---|
+| **base** (`src/`) | Arbitrary-width big-endian bytes, `std::unordered_map` hash-join | — (direct Python port) | The reference oracle every variant validates against |
+| **V1** (`variants/v1-fixedint/`) | Native `uint64_t`-limb fixed-width ints, same hash-join as base | base | Removes arbitrary-precision tax; the baseline every other variant builds on |
+| **V2** (`variants/v2-bucket/`) | Counting-sort bucket partition (tromp/xenoncat technique #2) instead of hash-join | V1 | Tests whether bucket-sort beats `unordered_map` here the way it does for Requihash's own solver |
+| **V3** (`variants/v3-pointer/`) | Parent-pair pointers into the previous round instead of growing index vectors | V1 | Measures the memory cost of index-pointer storage *under* Sequihash's k-list regularity — `SECURITY_ANALYSIS.md` §4.1/F-A4 predicts this is a liability, not a win, here; this variant makes that concrete |
+| **V4** (`variants/v4-static-inplace/`) | Pre-sized arena with slot reuse across rounds (techniques #3/#4) | V1 | Tests allocator-overhead reduction without changing representation |
+| **V5** (`variants/v5-unlimited-mem/`) | Class-prefix BLAKE2b precomputation (shared nonce+`i-` state cached per list) + full radix-sort merge | V1 | Assumes memory is free; tests how much a class-prefix hash-state cache buys |
+| **V6** (`variants/v6-square-khovratovich/`) | Structural mirror of Khovratovich's original C++ (`InitializeMemory`/`FillMemory`/`ResolveCollisions`/`FindProof`, 2D bucket table) | V1 | A second, independently-shaped differential oracle — a bug surviving two structurally unrelated ports is more likely a spec ambiguity than an implementation slip |
+
+Every variant keeps V1's fixed-width-integer representation, so the only
+thing that varies across V2–V6 is merge/storage strategy, not the
+integer-arithmetic baseline.
+
+## Known issues
+
+None open. Two fixes below explain the current memory/timing numbers:
+
+- **V4's index pool** reserves index slots per round depth, not a flat
+  `K` slots for every row (a leaf needs 1 slot, not `K`) — peak at
+  `(160,512)` is 1.79 GB.
+- **V6's `RoundTable`** is one flat heap buffer per round, not one
+  buffer per bucket (`nbuckets` allocations) — `(80,8)`-equivalent time
+  is 3.81s.
+
+## Current benchmark numbers
+
+**CS-convention points** (n, K — K is the literal list count, NOT
+`2^k`; see "Conventions" above), 5-rep min/median/MAD, Apple M4 Pro,
+Release build, nonce `00112233445566778899aabbccddeeff` unless noted:
+
+At `(n=80, K=8)`:
+
+| Variant | min | median | MAD |
+|---|---|---|---|
+| V1 fixed-int | 4.36s | 4.40s | 0.013s |
+| V2 bucket | 2.50s | 2.51s | 0.007s |
+| V3 pointer | 2.50s | 2.53s | 0.013s |
+| V4 static+inplace | 2.87s | 2.90s | 0.015s |
+| V5 unlimited-mem | 3.29s | 3.30s | 0.014s |
+| V6 square-Khovratovich | 3.81s | 3.84s | 0.038s |
+
+V2/V3 are fastest; V1 (the unoptimized baseline) is slowest; V6 (a
+structural, not performance, exercise) is second-slowest by design, no
+longer a >2x outlier after its fix.
+
+**Peak memory at `(n=160, K=512)`** (the largest committed vector,
+2 solutions, all 7 implementations agree byte-for-byte on the solution
+set):
+
+| Variant | Peak RSS |
+|---|---|
+| V1 / V2 / V5 | ~350 MB |
+| V6 | 2.64 GB |
+| V3 | 3.25 GB |
+| V4 | 1.79 GB |
+
+V3's elevated memory is the deliberate finding of that variant (index-pointer
+storage costs more, not less, once the k-list regularity constraint is
+in play) — not a bug. V6's is the cost of its own 2D-bucket-table
+approach (`kSlotSlack=64` slots/bucket, ~4 real occupants on average) —
+present by structural choice, already reduced once by the flat-storage
+fix above.
 
 ## Validation
 
-Vectors, generated by running the **actual Python reference** (not a
-reimplementation) at the task's required points, plus a **live
-differential pass** at every point — both, per the task's own
-requirement. `vectors/*.json` (schema:
-`{n, k, nonce_hex, solutions: [[index,...],...]}` — the paper's own raw
-`(hash_value, index_vector)` solver output, pre-encoding; a new schema,
-not `Req/vectors/`'s wire format, per the task's own instruction not to
-reuse that schema unchanged):
-
-| File | (n, K) | Solutions | Python wall time |
-|---|---|---|---|
-| `cs_vectors_n24_k8.json` | (24, 8) | 1 | <0.1s |
-| `cs_vectors_n40_k16.json` | (40, 16) | 1 | <0.1s |
-| `cs_vectors_n64_k128.json` | (64, 128) | 1 | ~0.1s |
-| `cs_vectors_n160_k512.json` | (160, 512) | 2 | 231.65s |
-
-The two smallest points are exactly the task's own examples (`(24,8)`,
-`(40,16)`). `(64,128)` and `(160,512)` are, respectively, the `K`
-equivalent to Requihash's `k=7` (`K=2^7=128`) and `k=9` (`K=2^9=512`)
-conventions, at the smallest `n` giving a non-degenerate (solution-
-bearing) point: `n` must satisfy both `n % 8 == 0` (the reference's own
-assertion) and `n % (log2(K)+1) == 0`, i.e. a multiple of
-`lcm(8, log2(K)+1)` — `24` for `K=128` (`lcm(8,8)=8`, checked `n=8,16,24`
-until non-degenerate) and `160` for `K=512` (`lcm(8,10)=40`, checked
-`n=40,80,120,160` — `120` ran but found zero solutions, `160` was the
-first working point, at 231s in Python; this cost is why `160,512` is a
-single committed vector rather than a repeated-trial benchmark case, see
-"Performance" below).
-
-`tests/differential.cpp` (built as `cs_differential`, wired into
-`ctest`) loads every file in `vectors/`, re-solves with the C++ port,
-and asserts **exact** index-vector equality (not just count) plus the
-port's own `verify()` self-check. All 4 vectors pass:
+All 7 implementations pass the same 4 vectors (`vectors/*.json`,
+generated by running the actual Python reference, not a
+reimplementation): `(24,8)`, `(40,16)`, `(64,128)`, `(160,512)`. Each
+variant has its own `tests/differential.cpp`/`cs_v*_differential`
+(wired into `ctest`) asserting exact index-vector equality plus
+self-verification.
 
 ```
-$ cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure
-...
-All 4 vector files matched.
-100% tests passed, 0 tests failed out of 1
+cmake -S . -B build && cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-C++ solves `(160,512)` in ~13s (release, `-O2`) — about 18x faster than
-the Python reference's 231s at the same point, consistent with a
-compiled hash-join/merge implementation vs. Python's interpreted
-`defaultdict`-based one; not a claim of algorithmic improvement, since
-both implement the identical merge-tree algorithm.
+Run the same from each `variants/vN-*/` directory for that variant.
 
-Byte-exact target: the index vector only, as the task specifies — there
-is no minimal/compressed wire encoding in the paper's own artifact to
-match. If a compact encoding is wanted downstream, that's a CS-specific
-design decision layered on top later, not something reverse-engineered
-from the Python reference here (it defines none).
+**k=1 note**: the Python reference's own `_solve` never runs its
+collision-check loop when `k=1` (the `for i in range(1,k)` loop body
+never executes), so it returns every leaf as an unverified "solution."
+V1–V5 (and base) reproduce this byte-exact-to-the-reference quirk
+faithfully; V6 deliberately diverges and returns zero solutions instead
+(the arguably-more-correct behavior). Not a bug in either — a documented
+difference in how faithfully each variant tracks the reference's own
+degenerate-input handling. Not a useful test point for anything else:
+`k=1` exercises no merge tree, no regularity binding.
+
+## Benchmark drivers
+
+Each implementation has a `cs_bench`/`cs_v*_bench` binary:
+`<n> <K> <nonce_hex> [--reps N] [--no-save]`, 5-rep min/median/MAD wall
+time + peak RSS, one JSON line matching
+`reqbench::run_record::RunRecord`'s schema. Every invocation writes a
+new file to that implementation's own `runs/<n><K>_<timestamp>.jsonl` —
+never appends, never touches another implementation's directory. A bad
+`(n,K)` is rejected immediately (before any solve work starts) with a
+message naming which rule failed — see `src/nk_check.hpp`.
 
 ## Build environment
 
-Same portable-BLAKE2b dependency as `../rk/` and `../rz/`: the
-repository's vendored copy `BLAKE/vendor/blake2/blake2b-ref.c` (Samuel
-Neves, CC0, no x86-specific intrinsics — builds unmodified on arm64
-and x86_64 alike), referenced repo-relative by `CMakeLists.txt`;
-override with `cmake -DBLAKE2_REF_DIR=...`. Provenance:
-`BLAKE/uniblake/PROVENANCE.md`.
-
-One CMake-specific pitfall hit and fixed during this port: `project(...)`
-must declare **both** `CXX` and `C` (`project(cs_klist CXX C)`) —
-declaring `CXX` only causes CMake to silently drop `blake2b-ref.c` (a
-`.c` source) from the `cs_klist` static library's build rule with no
-error at configure time, only a late `_blake2b` undefined-symbol linker
-error. Not obvious from the error message alone; worth flagging for
-anyone adding a C dependency to a nominally C++-only CMake project here.
-
-Build:
-
-```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-## A porting bug found and fixed during development — arbitrary-precision right-shift direction
-
-`hash_merge`'s XOR-accumulator is a big-endian byte string treated as an
-arbitrary-precision unsigned integer (`n` can exceed 64 bits — the
-reference's own docstring allows up to 256 bits, so this cannot be a
-fixed machine integer). The first implementation of the big-endian
-right-shift helper (`big_shr` in `src/klist.cpp`) shifted bytes toward
-the **front** of the array (lower index) instead of the **back** (higher
-index) — backwards for a big-endian representation, where the least
-significant byte is at the *end*. This produced a near-total hash-table
-collision explosion at every merge round: thousands of spurious
-"solutions" at `(24,8)` where the Python reference finds exactly one.
-Caught immediately by cross-checking against the committed vector
-(`[52,38,50,40,46,4,39,60]` expected, got 56+ bogus 8-tuples instead),
-not by a subtler downstream symptom — the differential test design (real
-reference output, not just "does it produce *a* solution") is what
-surfaced this quickly. Fixed by re-deriving the shift from first
-principles (walking output positions from the *last* byte backward,
-each built from the source byte `byte_shift` positions toward the
-front) and re-verified against hand-computed values
-(`0xAA3CAC >> 6 = 174322`, `>> 12 = 2723`) before re-running the full
-vector suite. See `big_shr`'s doc comment in `src/klist.cpp` for the
-corrected derivation.
+Vendored BLAKE2b (`BLAKE/vendor/blake2/blake2b-ref.c`, Samuel Neves,
+CC0), referenced repo-relative; override with `-DBLAKE2_REF_DIR=...`.
+`project(...)` must declare both `CXX` and `C` — `CXX`-only silently
+drops `blake2b-ref.c` from the build with no configure-time error, only
+a late undefined-symbol linker error.
 
 ## Layout
 
-- `src/klist.hpp`/`src/klist.cpp` — the ported algorithm. No stdio, no
-  logging, no console dependency.
-- `src/cs_gen.cpp` — CLI driver: `cs_gen <n> <k> <nonce_hex>` prints one
-  `{"n":...,"k":...,"nonce_hex":"...","solutions":[[...],...],"verified":...}`
-  JSON line, matching the vector-file schema (minus `verified`, which
-  the committed vectors omit since they're taken directly from the
-  Python reference's own output, which has no such field).
-- `tests/differential.cpp` — loads every `vectors/*.json` file (hand-
-  rolled minimal parser, not a JSON library — the schema is a five-field
-  flat structure not worth a dependency for) and validates exact
-  index-vector equality plus self-verification.
-- `vectors/` — the 4 committed KAT vectors (see "Validation").
-- `CMakeLists.txt` — builds `cs_klist` (static lib), `cs_gen`, and
-  `cs_differential` (wired into `ctest`).
+- `src/klist.hpp`/`.cpp` — base port. `src/cs_gen.cpp` — correctness
+  driver. `src/cs_bench.cpp` — benchmark driver. `src/nk_check.hpp` —
+  shared (n,K) pre-flight validity check, copied verbatim into each
+  variant's own `src/`.
+- `variants/vN-*/src/klist_vN.{hpp,cpp}` — each variant's algorithm.
+  `fixedint.hpp` (V1–V6) and `hashmsg.hpp` (V1–V5) are byte-identical
+  copies across variants (namespace-renamed only) — shared logic,
+  incidentally duplicated per this corpus's standalone-port convention,
+  not independently maintained.
+- `vectors/` — the 4 committed KAT vectors, shared by every
+  implementation's differential test.
 
-## Suggestions for further investigation / follow-on tests
+## Open questions / suggested follow-on work
 
-- **The index-trimming trade-off path** (`solve(index_bit_length=N)` in
-  the Python reference) is unported (see "Scope" above) — a natural
-  follow-on once the no-trade-off path has been in use for a while,
-  since it reuses the same `compute_hash_list`/`hash_merge` primitives.
-- **`(160,512)`'s 231s Python / 13s C++ cost** makes it impractical as a
-  repeated-trial benchmark case at that exact point; a `reqbench`-style
-  harness (matching `../rk/src/bin/rk_bench.rs`'s discipline, ported to
-  C++ or via a thin wrapper) would need either a smaller K=512-equivalent
-  point or an accepted single-sample exception for this one case,
-  explicitly justified rather than silently applied.
-- **A wider differential fuzz pass** (many random nonces at small, fast
-  parameter points, comparing live Python and C++ output pairwise) would
-  be more convincing than the 4 fixed vectors alone, per the task's own
-  "Validation" note that this is feasible and preferred at these small
-  sizes — not attempted in this pass; the 4 fixed-vector cross-check was
-  judged sufficient given the exact-match result at every point including
-  the largest, most solution-bearing one.
-- **Compare CS's merge-tree cost against RK's** (`../rk/`) and `Req/`'s
-  own solvers at roughly matching parameter scales — CS implements a
-  genuinely different algorithm shape (hash-table-join binary merge tree
-  over `K` lists, vs. RK/Req's bucket-based single/multi-list Wagner
-  walk), so a cross-corpus comparison at equivalent `(n, solution-size)`
-  points could be informative about which merge strategy is actually
-  faster in practice, not just in asymptotic terms.
+Tracked in `Req/PLAN.md` T5.2, not duplicated here.

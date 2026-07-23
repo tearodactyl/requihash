@@ -11,3 +11,4 @@ Req/SOLVER_CORPUS/**/target/
 prompt.txt
 .DS_Store
 **/.DS_Store
+__pycache__/

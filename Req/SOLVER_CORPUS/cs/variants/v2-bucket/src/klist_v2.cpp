@@ -1,4 +1,5 @@
 #include "klist_v2.hpp"
+#include "hashmsg.hpp"
 #include "blake2.h"
 
 #include <algorithm>
@@ -25,14 +26,16 @@ KListWagnerAlgorithmV2::KListWagnerAlgorithmV2(unsigned n, unsigned k, std::vect
 }
 
 FixedUint KListWagnerAlgorithmV2::compute_item(unsigned i, unsigned j) const {
-    std::string suffix = std::to_string(i) + "-" + std::to_string(j);
-    std::vector<uint8_t> message(nonce_);
-    message.insert(message.end(), suffix.begin(), suffix.end());
+    // Allocation-free message + digest construction (../../README.md
+    // "Known issues") -- same bytes, same blake2b call, no std::string/
+    // std::vector heap traffic per call.
+    uint8_t msgbuf[cs_common::kMaxMessageBytes];
+    size_t msglen = cs_common::build_leaf_message(nonce_.data(), i, j, msgbuf);
 
-    std::vector<uint8_t> digest(hash_size_);
-    int rc = blake2b(digest.data(), hash_size_, message.data(), message.size(), nullptr, 0);
+    uint8_t digest[64];
+    int rc = blake2b(digest, hash_size_, msgbuf, msglen, nullptr, 0);
     if (rc != 0) throw std::runtime_error("blake2b failed");
-    return FixedUint::from_be_bytes(digest.data(), hash_size_);
+    return FixedUint::from_be_bytes(digest, hash_size_);
 }
 
 std::vector<HashItem> KListWagnerAlgorithmV2::compute_hash_list(unsigned i) const {

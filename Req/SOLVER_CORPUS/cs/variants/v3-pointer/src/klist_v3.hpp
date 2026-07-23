@@ -13,7 +13,7 @@
 // to needs extra bookkeeping index pointers alone don't carry cheaply
 // (Proposition 3's (k^2+5k+2)/4 term). This port exists to MEASURE that
 // concretely on Sequihash's own reference algorithm, not to recommend
-// pointer storage for production use here. See variants/README.md for
+// pointer storage for production use here. See ../../README.md for
 // the measured comparison against V1/V2's explicit-index approach.
 //
 // Pointer encoding: a row is (FixedUint value, uint32_t left, uint32_t
@@ -75,7 +75,7 @@ public:
     // cost centre in both this and V1/V2 (a FixedUint + a small pointer
     // struct vs. a FixedUint + growing index_vector), so summing live
     // row counts * their respective row byte-sizes at each round
-    // boundary is what variants/README.md's comparison actually reports
+    // boundary is what ../../README.md's comparison actually reports
     // (see bench harness) -- this field just exposes the raw counts.
     mutable std::vector<size_t> round_row_counts;
 

@@ -104,6 +104,14 @@ namespace _POW{
         */
         Equihash(unsigned n_in, unsigned k_in, Seed s) :n(n_in), k(k_in), seed(s) {};
         ~Equihash() {};
+        // Added 2026-07-20 for rk_single_bench.cpp's single-attempt
+        // measurement driver (Req/SOLVER_CORPUS/rk -- fixes the
+        // allocator-peak-vs-whole-process-RSS measurement mismatch
+        // FindProof's multi-nonce retry loop caused; see that file's own
+        // doc comment). The only change to this vendored file: a public
+        // setter for the otherwise-private `nonce` member. No existing
+        // method's behavior is altered.
+        void SetNonce(Nonce v) { nonce = v; }
 		Proof FindProof();
         void FillMemory(uint32_t length);      //fill with hash
         void InitializeMemory(); //allocate memory 

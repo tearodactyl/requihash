@@ -18,7 +18,7 @@
 // reuse of freed ranges, which is the allocator-overhead reduction
 // technique #3/#4 actually buys (BENCHMARK.md's finding that per-row
 // heap allocation dominates solve time applies here too, see
-// variants/README.md's measured comparison).
+// ../../README.md's measured comparison).
 #ifndef CS_V4_KLIST_HPP
 #define CS_V4_KLIST_HPP
 
@@ -31,19 +31,29 @@ namespace cs_v4 {
 
 struct Row {
     FixedUint value;
-    // Fixed-capacity index storage sized to k_ at construction time (see
-    // Arena::index_cap) -- avoids std::vector's own heap allocation per
-    // row, the other half of "static allocation" at the row level, not
-    // just the round level. Stored as an offset (not a raw pointer) into
-    // Arena::index_pool so the pool can safely grow (reallocate) without
-    // invalidating live rows -- see Arena's growth note.
-    uint32_t index_off; // row's slot base within index_pool = index_off * index_cap
-    uint32_t index_len;
+    // Fixed-capacity index storage, sized to THIS ROW's actual round
+    // depth (index_len = 2^depth: 1 at the leaves, 2, 4, ... up to k_ at
+    // the root) -- NOT a flat k_ slots for every row regardless of round
+    // (the original design here, found to waste ~99% of reserved index
+    // space at early/populous rounds when k_ is large: e.g. at (160,512)
+    // every one of the ~10M leaf-round rows reserved 512 slots to hold 1
+    // real index, a 16.6GB peak vs. V1/V2/V5's ~350MB at the same point
+    // -- root-caused and fixed 2026-07-20). Rows are stored in
+    // PER-ROUND-WIDTH pools (Arena::index_pool_for_width), one flat
+    // vector<uint32_t> per distinct width (1,2,4,...,k_) actually used,
+    // each row within a pool getting exactly `width` slots -- still one
+    // bulk allocation per width (not per row), preserving "static
+    // allocation, no per-row heap alloc"; just no longer over-provisioned
+    // to the GLOBAL maximum width for every row regardless of its own
+    // round.
+    uint32_t index_off;  // row's slot base WITHIN ITS WIDTH POOL = index_off * index_width
+    uint32_t index_len;  // == this row's index_width (kept for clarity/assertions)
 };
 
-// One arena for the whole solve: a row pool and a matching index pool
-// (index_cap = k_ uint32_t's per row, the maximum any row ever needs),
-// with a free-list of reclaimed row slots. Pre-sized from an estimated
+// One arena for the whole solve: a row pool (Row::value + bookkeeping)
+// plus a family of index pools, one per distinct index width actually
+// used (1, 2, 4, ..., up to k_), each row using exactly the pool
+// matching its own round depth. Pre-sized from an estimated row-count
 // budget (STATIC ALLOCATION, technique #3) for the common case of no
 // reallocation; grows (geometric doubling, like a normal Vec) only if a
 // merge round's real output exceeds the estimate -- Sequihash's k-list
@@ -56,23 +66,68 @@ struct Row {
 class Arena {
 public:
     void init(size_t max_live_rows, unsigned k);
-    // Allocates `count` contiguous row slots (reused from the free-list
-    // if available, else bump-allocated, growing the pool if needed);
-    // returns the base slot index.
-    size_t alloc_rows(size_t count);
-    // Returns a previously allocated [base, base+count) range to the
-    // free-list for reuse by a later alloc_rows call.
-    void free_rows(size_t base, size_t count);
 
-    std::vector<Row> rows;
-    std::vector<uint32_t> index_pool;
-    unsigned index_cap = 0;
-    size_t grow_events = 0; // diagnostic: how many times the estimate was exceeded
+    // Row-bookkeeping pool (Row::value + index_off/index_len) -- ONE
+    // shared pool across every round/width, entirely separate from the
+    // per-width index-slot pools below. A row's bookkeeping slot and its
+    // index-value slot are allocated independently (different pools,
+    // different bump cursors, different free-lists) and only linked by
+    // Row::index_off/index_len -- conflating the two (using a width
+    // pool's allocation offset as if it were a row-pool offset) was this
+    // fix's first draft's actual bug (heap-buffer-overflow, ASan-caught,
+    // 2026-07-20 at (64,128): a width-0 alloc_rows offset was used to
+    // index into the width-independent `rows` array, which has its own,
+    // unrelated occupancy). Fixed by giving `rows` its own bump/free-list
+    // pair, never shared with any WidthPool's.
+    size_t alloc_row_slots(size_t count);
+    void free_row_slots(size_t base, size_t count);
+
+    // Allocates `count` contiguous index slots from the pool for
+    // `index_width` (reused from that width's free-list if available,
+    // else bump-allocated, growing that width's pool if needed); returns
+    // the base slot index WITHIN THAT WIDTH POOL (not a row index).
+    // `index_width` must be a power of 2 in [1, k_] (a round's actual
+    // index length).
+    size_t alloc_index_slots(size_t count, unsigned index_width);
+    void free_index_slots(size_t base, size_t count, unsigned index_width);
+
+    std::vector<Row> rows; // shared row-bookkeeping pool, independent of width
+    size_t grow_events = 0; // diagnostic: how many times any pool's estimate was exceeded
+
+    // Per-width index storage. Keyed by round depth (0..lgk_), not width
+    // directly, since depth is what callers naturally have on hand and
+    // width = 2^depth is a one-line derivation -- avoids a map lookup by
+    // width value.
+    struct WidthPool {
+        std::vector<uint32_t> index_pool;
+        std::vector<std::pair<size_t, size_t>> free_list; // (base, count), in index_width-row units
+        size_t bump = 0;
+    };
+    std::vector<WidthPool> width_pools; // width_pools[depth] for depth in [0, lgk_]
+
+    uint32_t* indices_of(size_t row_idx) {
+        const Row& r = rows[row_idx];
+        unsigned depth = width_to_depth(r.index_len);
+        return &width_pools[depth].index_pool[(size_t)r.index_off * r.index_len];
+    }
+    const uint32_t* indices_of(size_t row_idx) const {
+        const Row& r = rows[row_idx];
+        unsigned depth = width_to_depth(r.index_len);
+        return &width_pools[depth].index_pool[(size_t)r.index_off * r.index_len];
+    }
 
 private:
-    std::vector<std::pair<size_t, size_t>> free_list_; // (base, count)
-    size_t bump_ = 0;
-    void grow_to(size_t new_capacity_rows);
+    unsigned lgk_ = 0;
+    static unsigned width_to_depth(unsigned width) {
+        unsigned d = 0;
+        while ((1u << d) < width) ++d;
+        return d;
+    }
+    void grow_width_pool(unsigned depth, size_t new_capacity_rows);
+    void grow_row_pool(size_t new_capacity_rows);
+
+    std::vector<std::pair<size_t, size_t>> row_free_list_; // (base, count), row-pool's own, never mixed with any WidthPool's
+    size_t row_bump_ = 0;
 };
 
 class KListWagnerAlgorithmV4 {

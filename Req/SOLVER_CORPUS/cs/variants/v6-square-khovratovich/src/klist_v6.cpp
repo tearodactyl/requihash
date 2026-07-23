@@ -30,14 +30,27 @@ constexpr unsigned kSlotSlack = 64;
 // operation this port's shared representation exposes -- functionally
 // identical bucketing role, bit-position choice is representation
 // detail, not an algorithmic difference).
+//
+// Storage: a SINGLE flat vector<Tuple> of nbuckets*slot_capacity
+// elements (bucket b's slots live at [b*slot_capacity, (b+1)*slot_capacity)),
+// not the original vector<vector<Tuple>> -- see ../../README.md
+// "Known issues": the 2D form allocates nbuckets SEPARATE heap buffers per round
+// (profiled: RoundTable::init was V6's dominant cost, ~600-700 samples
+// per call site, nbuckets separate std::vector<Tuple> constructions each
+// round), each pre-sized to kSlotSlack=64 regardless of real occupancy
+// (measured average ~4). One flat allocation is the same total capacity,
+// one allocation instead of nbuckets. filledList (occupancy per bucket)
+// is unchanged -- still one counter per bucket, not per slot.
 struct RoundTable {
     unsigned bucket_bits;
-    std::vector<std::vector<Tuple>> tupleList; // [bucket][slot]
-    std::vector<unsigned> filledList;          // occupancy per bucket
+    unsigned slot_capacity;
+    std::vector<Tuple> tupleList;     // flat: bucket b's slots at [b*slot_capacity, (b+1)*slot_capacity)
+    std::vector<unsigned> filledList; // occupancy per bucket
 
-    void init(unsigned bucket_bits_in, size_t nbuckets, unsigned slot_capacity) {
+    void init(unsigned bucket_bits_in, size_t nbuckets, unsigned slot_capacity_in) {
         bucket_bits = bucket_bits_in;
-        tupleList.assign(nbuckets, std::vector<Tuple>(slot_capacity));
+        slot_capacity = slot_capacity_in;
+        tupleList.assign(nbuckets * (size_t)slot_capacity, Tuple{});
         filledList.assign(nbuckets, 0);
     }
 
@@ -52,10 +65,16 @@ struct RoundTable {
     bool insert(const FixedUint& value, uint32_t reference) {
         size_t b = bucket_of(value);
         unsigned& count = filledList[b];
-        if (count >= tupleList[b].size()) return false; // overflow (should not happen, see kSlotSlack)
-        tupleList[b][count] = Tuple{value, reference};
+        if (count >= slot_capacity) return false; // overflow (should not happen, see kSlotSlack)
+        tupleList[b * (size_t)slot_capacity + count] = Tuple{value, reference};
         ++count;
         return true;
+    }
+
+    // Accessor matching the original's tupleList[bucket][slot] shape,
+    // so call sites elsewhere in this file read the same as before.
+    const Tuple& at(size_t bucket, size_t slot) const {
+        return tupleList[bucket * (size_t)slot_capacity + slot];
     }
 };
 
@@ -174,9 +193,9 @@ std::vector<std::vector<uint32_t>> KListWagnerAlgorithmV6::solve_internal() cons
         // O(nbuckets^2) cross-product, which does not scale.
         std::unordered_map<uint64_t, std::vector<std::pair<size_t, unsigned>>> index1;
         index1.reserve(nrows_est);
-        for (size_t b1 = 0; b1 < r1.tupleList.size(); ++b1) {
+        for (size_t b1 = 0; b1 < r1.filledList.size(); ++b1) {
             for (unsigned s1 = 0; s1 < r1.filledList[b1]; ++s1) {
-                uint64_t key1 = r1.tupleList[b1][s1].value.low_bits_key(mask_bit);
+                uint64_t key1 = r1.at(b1, s1).value.low_bits_key(mask_bit);
                 index1[key1].emplace_back(b1, s1);
             }
         }
@@ -189,13 +208,13 @@ std::vector<std::vector<uint32_t>> KListWagnerAlgorithmV6::solve_internal() cons
                 reconstruct(h->parent_right, f.ref2, out_idx);
             };
 
-        for (size_t b2 = 0; b2 < r2.tupleList.size(); ++b2) {
+        for (size_t b2 = 0; b2 < r2.filledList.size(); ++b2) {
             for (unsigned s2 = 0; s2 < r2.filledList[b2]; ++s2) {
-                const Tuple& t2 = r2.tupleList[b2][s2];
+                const Tuple& t2 = r2.at(b2, s2);
                 auto it = index1.find(t2.value.low_bits_key(mask_bit));
                 if (it == index1.end()) continue;
                 for (const auto& [b1, s1] : it->second) {
-                    const Tuple& t1 = r1.tupleList[b1][s1];
+                    const Tuple& t1 = r1.at(b1, s1);
                     FixedUint merged_value = (t1.value ^ t2.value).shr(mask_bit);
                     ForkPair fork{t1.reference, t2.reference};
                     if (is_root) {

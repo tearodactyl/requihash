@@ -1,0 +1,1 @@
+{"impl":"rk-cpp","lang":"cpp","point":{"n":110,"k_or_K":4,"convention":"tree_depth_k"},"nonce_or_seed":"seed=5,nonce=2","reps":5,"wall_min_ms":5877.8847,"wall_median_ms":5966.8948,"wall_mad_ms":67.3483,"peak_mem_bytes":2769289216,"mem_instrument":"os_rss","solutions_found":null,"git_rev":"987c16b","git_dirty":true,"machine":"arm64/x86_64 (macOS)"}
